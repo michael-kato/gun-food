@@ -1,4 +1,4 @@
-# cartridge-models
+# cartridges
 
 Parametric, dimensionally accurate 3D models of firearm cartridges for Blender, with
 procedural, physically based materials. Every case, primer and bullet is generated from a
@@ -83,7 +83,7 @@ specs/*.toml ──▶ specs.py      load, fill defaults, validate (pure Python)
 
 1. Copy a similar file in `specs/` (straight-walled pistol: `9mm.toml`; bottleneck rifle:
    `223.toml`; rimfire: `22LR.toml`) and edit the numbers. Field names follow C.I.P.
-   drawings; `cartridge_models/specs.py` documents every field and its default.
+   drawings; `cartridges/specs.py` documents every field and its default.
 2. For a bottleneck case, give `shoulder_start` (L1) and either `neck_start` (L2) or
    `shoulder_angle`.
 3. List anything you estimated in `approx = [...]` and fill in `[sources]`.

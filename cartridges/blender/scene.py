@@ -40,6 +40,13 @@ def reset_scene():
     cy.denoiser = "OPENIMAGEDENOISE"
     scene.render.resolution_x, scene.render.resolution_y = 1920, 1080
     scene.render.film_transparent = False
+    # Don't write render metadata (file path, date, render time) into images.
+    for name in dir(scene.render):
+        if name.startswith("use_stamp"):
+            try:
+                setattr(scene.render, name, False)
+            except (AttributeError, TypeError):
+                pass
     studio_world()
     return scene
 

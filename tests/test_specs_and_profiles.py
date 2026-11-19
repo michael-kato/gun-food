@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from cartridge_models import profiles, specs  # noqa: E402
+from cartridges import profiles, specs  # noqa: E402
 
 CARTS = specs.load_all()
 TOL = 1e-6

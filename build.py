@@ -24,8 +24,8 @@ sys.path.insert(0, str(ROOT))
 
 import bpy  # noqa: E402
 
-from cartridge_models import specs  # noqa: E402
-from cartridge_models.blender import scene as sc  # noqa: E402
+from cartridges import specs  # noqa: E402
+from cartridges.blender import scene as sc  # noqa: E402
 
 
 def main(argv):

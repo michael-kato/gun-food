@@ -1,4 +1,9 @@
-# cartridges
+# gun-food
+
+<p align="center">
+  <img src="docs/img/gun-food.webp" alt="Hank Venture at a mounted gun: &quot;I'M OUT OF GUN FOOD!&quot;" width="420">
+  <br><sub>Hank Venture, <i>The Venture Bros.</i></sub>
+</p>
 
 Parametric, dimensionally accurate 3D models of firearm cartridges for Blender, with
 procedural, physically based materials. Every case, primer and bullet is generated from a

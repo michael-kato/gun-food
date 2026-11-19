@@ -261,8 +261,18 @@ def bullet_profile(b: BulletSpec, seat_depth: float | None = None, seg: int = 32
     return round_corners(pts, seg=4)
 
 
-def primer_profile(c: CaseSpec, recess: float = 0.08):
-    """Primer cup, top face ``recess`` mm inside the case head."""
+def primer_profile(c: CaseSpec, recess: float = 0.08, strike: tuple[float, float] | None = None):
+    """Primer cup, top face ``recess`` mm inside the case head.
+
+    ``strike`` = (radius, depth) adds a firing-pin crater in the middle of a fired primer.
+    """
     rc = c.primer_cup_dia / 2
-    pts = [(0.0, recess, 0, 0), (rc, recess, 0.25, 0), (rc, c.pocket_depth, 0, 0), (0.0, c.pocket_depth, 0, 0)]
+    if strike:
+        sr, sd = min(strike[0], rc * 0.6), min(strike[1], c.pocket_depth * 0.4)
+        rs = (sr**2 + sd**2) / (2 * sd)  # spherical crater, like a hemispherical firing pin
+        pts = [(sr * i / 6, recess + math.sqrt(rs**2 - (sr * i / 6) ** 2) - (rs - sd), 0, 0) for i in range(6)]
+        pts.append((sr, recess, 0.2, 0))
+    else:
+        pts = [(0.0, recess, 0, 0)]
+    pts += [(rc, recess, 0.25, 0), (rc, c.pocket_depth, 0, 0), (0.0, c.pocket_depth, 0, 0)]
     return round_corners(pts, seg=4)

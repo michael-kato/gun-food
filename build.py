@@ -74,7 +74,7 @@ def main(argv):
         print(f"  overview.jpg {time.time() - t1:.1f}s")
         t1 = time.time()
         sc.render_details(carts, args.render, seed=args.seed)
-        print(f"  lineup.jpg + headstamps.jpg {time.time() - t1:.1f}s")
+        print(f"  lineup.jpg, headstamps.jpg, fired.jpg {time.time() - t1:.1f}s")
 
 
 if __name__ == "__main__":

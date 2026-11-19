@@ -79,6 +79,7 @@ Every copy in the scene is a separate, seeded sample of its spec (`cartridges/va
   SAAMI's limits. Bullet length varies 0.4% (one SD).
 - Factory-new handling damage: about 0.6 dents per 10 mm of case, 0.008–0.05 mm deep; up to 0.015 mm out-of-round at the mouth;
   a 25% chance of a dinged mouth on empty cases; bullet runout with a 0.12° SD tilt.
+- Fired cases (`fired` condition): body grows 0.03–0.1 mm and neck 0.05–0.15 mm on diameter toward the chamber, crimp gone, shoulder up to 0.08 mm forward; firing-pin crater 0.2–0.5 mm deep (rimfire: crushed rim); extractor nick; dents up to 0.2 mm deep from rocks and boots; soot inside and blow-by outside; dirt.
 
 Sources for the spread: [new brass lot lengths](https://thefiringline.com/forums/showthread.php?p=2300477),
 [factory 9mm length variation](https://purple.thefiringline.com/goto/post?id=6804786),

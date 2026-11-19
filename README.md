@@ -8,7 +8,8 @@
 Parametric 3D models of firearm cartridges for Blender, built to **SAAMI dimensions and
 tolerances**, with procedural, physically based materials tuned for EEVEE. Every copy in a
 scene is a different, seeded sample: dimensions drawn inside the manufacturing tolerances,
-plus the small dents, out-of-round and runout that bulk-packed factory ammo picks up.
+plus the small dents, out-of-round and runout that bulk-packed factory ammo picks up. Fired
+brass comes expanded, struck, sooty and dirty, the way it's found on the ground.
 
 Built for synthetic training data (casing / caliber recognition) and for artists who want
 correct proportions.
@@ -18,6 +19,8 @@ correct proportions.
 ![Side lineup](docs/img/lineup.jpg)
 
 ![Headstamps](docs/img/headstamps.jpg)
+
+![Fired cases](docs/img/fired.jpg)
 
 ## What's included
 
@@ -37,10 +40,10 @@ correct proportions.
 estimated, and where each came from. It's generated from the spec files, so it always
 matches the models.
 
-`cartridges.blend` holds every cartridge as two tightly packed groups of seven (loaded
-rounds and primed empty cases) with 10 mm between groups. Each object carries its sampled
-values as custom properties (`case_length`, `oal`, `bullet_dia`, `seed`, …), handy as
-training labels.
+`cartridges.blend` holds every cartridge as three tightly packed groups of seven (loaded
+rounds, new primed cases, fired cases) with 10 mm between groups. Each copy carries its
+sampled values as custom properties (`case_length`, `oal`, `bullet_dia`, `condition`,
+`dirt`, `seed`, …), handy as training labels.
 
 ## Build
 
@@ -55,13 +58,13 @@ blender --background --factory-startup --python build.py -- --report docs/dimens
 | `--seed N` | variation seed (default 1); the same seed rebuilds the same scene |
 | `--only 9mm 308` | build only some cartridges |
 | `--engine eevee` | `eevee` (default) or `cycles` |
-| `--render DIR` | also render overview, side lineup and headstamp images |
+| `--render DIR` | also render overview, side lineup, headstamp and fired close-up images |
 | `--report PATH` | measure every copy against its tolerance band ([example](docs/dimension_check.md)) |
 | `--out PATH` | where to write the .blend (default `cartridges.blend`) |
 | `--cpu` | Cycles only: render on the CPU |
 
-A full build takes about 30 s and makes ~1M vertices; the three preview images take about
-20 s in EEVEE. The .blend is about 30 MB, so it isn't kept in git: build it, or download it
+A full build takes about 30 s and makes ~1.7M vertices; the four preview images take about
+20 s in EEVEE. The .blend is about 60 MB, so it isn't kept in git: build it, or download it
 from the repo's Releases.
 
 ## How it works
@@ -87,18 +90,26 @@ specs/*.toml, bullets/*.toml ──▶ specs.py      load, fill defaults, valida
   bullet's cannelure, which sets their seating depth; the .22 LR is crimped onto its heel.
   Empty cases stay uncrimped.
 - **Handling damage** (factory new, bulk packed): a few shallow dents, slight out-of-round
-  toward the mouth, the odd dinged case mouth, bullet runout, softened edges.
+  toward the mouth, the odd dinged case mouth, bullet runout, softened edges, a light film
+  of dust.
+- **Fired brass** (`fired` condition): body and neck expanded toward the chamber, crimp
+  gone, shoulder pushed slightly forward, a firing-pin crater in the primer (a crushed rim
+  on rimfire), an extractor nick, bigger dents and dinged mouths from rocks and boots,
+  charred interiors (heaviest at the bottom by the flash hole), blow-by soot on the neck,
+  and patchy soil caked into the recesses. Add more conditions in `variation.CONDITIONS`.
 - **Headstamps** are real geometry, stamped in two layers (a shallow full letter and a deeper,
   thinner core) for soft, rounded letter walls, with each letter's position, angle, size and
   depth jittered like a hand-set bunter. Rimfire marks are raised.
 - **Materials** share one node graph per metal (brass, gilding metal, copper, lead, nickel,
   steel, aluminium): measured reflectance, F82 edge tint, tarnish, drawing marks, sparse
-  dings and micro-dents. A baked `cavity` vertex attribute darkens recesses (letters,
-  primer gap, extractor groove, case interior) instead of using costly ambient occlusion.
-  Rifle necks carry a faint annealing tint (`anneal_z0`, `anneal_z1`, `anneal_amt` object
-  properties).
-- **EEVEE setup:** a reflection probe, shadows, no screen-space ray tracing (it smears copper
-  beside thin parts at this scale).
+  dings and micro-dents, plus dirt and soot layers. Everything a copy needs is either baked
+  into vertex attributes (`cavity` for recesses instead of costly ambient occlusion,
+  `interior`, `zn` height along the case, `anneal` band) or packed into the object colour
+  (R dirt, G soot inside, B soot outside, A annealing tint), which EEVEE reads as a plain
+  uniform. Set an object's colour to make it cleaner or filthier.
+- **EEVEE setup:** screen-space ray tracing with a 2 mm trace thickness (the 0.2 m default
+  smears copper beside millimetre-sized parts), shadows, no fast GI. Detail shots use a long
+  lens instead of an orthographic camera, which also breaks screen-space reflections.
 
 ## Adding or changing a cartridge
 
@@ -138,7 +149,8 @@ practice (`223 REM`, `45 AUTO`, …). Change `[headstamp]` in a spec to use your
 
 ## Roadmap
 
-- Fired cases: charred interior, dirt, firing-pin strike, expanded necks, extractor marks
+- Fired cases: ejector marks, chamber scuffs, off-centre strikes, split necks, crushed cases;
+  scattered (lying) layouts for field scenes
 - Case variations: steel (lacquered and polymer coated), aluminium, nickel plated
 - More bullet types: hollow point, soft point, polymer tip, lead round nose, wadcutter
 - More cartridges, and a Blender add-on panel to build and re-roll copies without the

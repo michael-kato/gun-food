@@ -9,9 +9,12 @@ Every copy is a *realization* of its spec, drawn from a seed:
 * **Loaded length** follows the factory nominal with a small spread (forum measurements:
   bulk 9mm varies a few tenths of a mm, match .223 under 0.1 mm), clamped to SAAMI's
   min/max. Roll-crimped rifle rounds seat on the bullet's cannelure instead.
-* **Handling damage** for factory-new ammo that was tumbled, boxed and shipped in bulk:
-  a few shallow dents, slight out-of-round, the odd dinged case mouth, small bullet
-  runout. ``CONDITIONS`` holds the presets; fired cases can be added there later.
+* **Condition** (``CONDITIONS``): ``new`` is factory-new ammo that was tumbled, boxed and
+  shipped in bulk: a few shallow dents, slight out-of-round, the odd dinged case mouth,
+  small bullet runout, a light film of dust. ``fired`` is brass picked up off the ground:
+  body and neck expanded to the chamber, crimp gone, firing-pin crater in the primer (a
+  rim crush on rimfire), an extractor nick, bigger dents from rocks and boots, soot
+  inside and blow-by outside, and dirt.
 
 Pure Python, deterministic for a given seed.
 """
@@ -50,6 +53,18 @@ class Condition:
     runout_sd: float  # bullet tilt, degrees
     tip_ding_chance: float
     edge_softening: tuple[float, float]  # multiplier on edge fillet radii
+    dirt: tuple[float, float]  # material: soil / dust coverage, 0-1
+    soot_in: tuple[float, float] = (0.0, 0.0)  # material: powder residue inside, 0-1
+    soot_out: tuple[float, float] = (0.0, 0.0)  # material: blow-by on the neck outside, 0-1
+    fired: bool = False
+    body_growth: tuple[float, float] = (0.0, 0.0)  # mm on diameter, case expanded to the chamber
+    neck_growth: tuple[float, float] = (0.0, 0.0)  # mm on diameter, neck released the bullet
+    shoulder_forward: tuple[float, float] = (0.0, 0.0)  # mm, bottleneck cases fire-form forward
+    length_growth: tuple[float, float] = (0.0, 0.0)  # mm
+    primer_strike_radius: tuple[float, float] = (0.0, 0.0)  # mm, firing-pin crater
+    primer_strike_depth: tuple[float, float] = (0.0, 0.0)  # mm
+    rim_strike_depth: tuple[float, float] = (0.0, 0.0)  # mm, rimfire firing pin crush
+    extractor_nick_chance: float = 0.0
 
 
 CONDITIONS = {
@@ -64,6 +79,31 @@ CONDITIONS = {
         runout_sd=0.12,
         tip_ding_chance=0.3,
         edge_softening=(1.0, 1.12),
+        dirt=(0.06, 0.18),
+    ),
+    "fired": Condition(
+        name="fired",
+        dents_per_10mm=1.4,
+        dent_radius=(0.8, 3.0),
+        dent_depth=(0.02, 0.20),
+        mouth_ding_chance=0.6,
+        mouth_ding_depth=(0.05, 0.25),
+        ovality=(0.0, 0.08),
+        runout_sd=0.0,
+        tip_ding_chance=0.0,
+        edge_softening=(1.0, 1.15),
+        dirt=(0.45, 1.0),
+        soot_in=(0.6, 1.0),
+        soot_out=(0.4, 1.0),
+        fired=True,
+        body_growth=(0.03, 0.10),
+        neck_growth=(0.05, 0.15),
+        shoulder_forward=(0.0, 0.08),
+        length_growth=(0.0, 0.05),
+        primer_strike_radius=(0.55, 0.90),
+        primer_strike_depth=(0.20, 0.50),
+        rim_strike_depth=(0.20, 0.40),
+        extractor_nick_chance=0.7,
     ),
 }
 
@@ -81,16 +121,22 @@ class Copy:
     """One concrete cartridge, case or bullet, with every sampled value."""
 
     seed: int
-    kind: str  # loaded | case | bullet
+    kind: str  # loaded | case | fired | bullet
+    condition: str
     case: CaseSpec
     bullet: BulletSpec
     seat_depth: float
     oal: float
     crimp: Crimp | None
     case_dents: list[Dent] = field(default_factory=list)
+    rim_dents: list[Dent] = field(default_factory=list)  # extractor nick, rimfire strike
     bullet_dents: list[Dent] = field(default_factory=list)
     ovality: tuple[float, float] = (0.0, 0.0)  # amplitude, phase
     runout: tuple[float, float] = (0.0, 0.0)  # tilt degrees, azimuth radians
+    primer_strike: tuple[float, float] | None = None  # crater radius, depth (mm)
+    dirt: float = 0.0
+    soot_in: float = 0.0
+    soot_out: float = 0.0
     headstamp_seed: int = 0
 
     def labels(self) -> dict:
@@ -98,16 +144,20 @@ class Copy:
         out = {
             "seed": self.seed,
             "kind": self.kind,
+            "condition": self.condition,
             "case_length": round(self.case.length, 4),
             "case_rim_dia": round(self.case.rim_dia, 4),
             "case_base_dia": round(self.case.base_dia, 4),
             "case_mouth_dia": round(self.case.mouth_dia - (self.crimp.amount if self.crimp else 0.0), 4),
-            "bullet_dia": round(self.bullet.dia, 4),
-            "bullet_length": round(self.bullet.length, 4),
             "dent_count": len(self.case_dents),
+            "dirt": round(self.dirt, 3),
         }
+        if self.kind in ("loaded", "bullet"):
+            out.update(bullet_dia=round(self.bullet.dia, 4), bullet_length=round(self.bullet.length, 4))
         if self.kind == "loaded":
             out.update(oal=round(self.oal, 4), seat_depth=round(self.seat_depth, 4), runout_deg=round(self.runout[0], 4))
+        if self.kind == "fired":
+            out.update(soot_in=round(self.soot_in, 3), soot_out=round(self.soot_out, 3))
         return out
 
 
@@ -158,6 +208,18 @@ def sample_case(cart: Cartridge, rng: random.Random, cond: Condition) -> CaseSpe
         new["groove_dia"] = _band(rng, k.groove_dia, cart.tol("groove_dia_tol"), "rim")
     if k.base_dia < k.mouth_dia + 0.02:  # straight walls: never let the mouth end up wider than the base
         new["mouth_dia"] = min(new["mouth_dia"], new["base_dia"])
+    if cond.fired:  # brass springs most of the way out to the chamber
+        grow = rng.uniform(*cond.body_growth)
+        new["base_dia"] += grow
+        new["length"] += rng.uniform(*cond.length_growth)
+        if k.bottleneck:
+            new["shoulder_dia"] += grow
+            fwd = rng.uniform(*cond.shoulder_forward)
+            new["shoulder_start"] += fwd
+            new["neck_start"] += fwd
+            new["mouth_dia"] += rng.uniform(*cond.neck_growth)
+        else:
+            new["mouth_dia"] = min(new["base_dia"], new["mouth_dia"] + grow + rng.uniform(0.0, 0.04))
     return replace(k, **new)
 
 
@@ -189,8 +251,12 @@ def _dents(rng, count, z_range, radius, depth):
     return out
 
 
-def realize(cart: Cartridge, seed: int, kind: str = "loaded", condition: str = "new") -> Copy:
-    """Sample one in-tolerance copy of ``cart``. ``kind``: loaded, case or bullet."""
+def realize(cart: Cartridge, seed: int, kind: str = "loaded", condition: str | None = None) -> Copy:
+    """Sample one copy of ``cart``. ``kind``: loaded, case, fired or bullet.
+
+    ``condition`` defaults to ``fired`` for fired cases and ``new`` otherwise.
+    """
+    condition = condition or ("fired" if kind == "fired" else "new")
     cond = CONDITIONS[condition]
     rng = random.Random(seed)
     case = sample_case(cart, rng, cond)
@@ -215,8 +281,17 @@ def realize(cart: Cartridge, seed: int, kind: str = "loaded", condition: str = "
     body_lo = (case.groove_top or case.rim_thickness) + 0.8
     n = _poisson(rng, cond.dents_per_10mm * case.length / 10)
     case_dents = _dents(rng, n, (body_lo, case.length - 0.4), cond.dent_radius, cond.dent_depth)
-    if kind == "case" and rng.random() < cond.mouth_ding_chance:
-        case_dents.append(Dent(case.length - rng.uniform(0.0, 0.5), rng.uniform(0, 2 * math.pi), rng.uniform(0.6, 1.3), rng.uniform(*cond.mouth_ding_depth)))
+    if kind in ("case", "fired") and rng.random() < cond.mouth_ding_chance:
+        case_dents.append(Dent(case.length - rng.uniform(0.0, 0.5), rng.uniform(0, 2 * math.pi), rng.uniform(0.6, 1.6), rng.uniform(*cond.mouth_ding_depth)))
+
+    rim_dents, strike = [], None
+    if cond.fired:
+        if case.rimfire:  # the firing pin crushes the rim edge
+            rim_dents.append(Dent(case.rim_thickness * 0.5, rng.uniform(0, 2 * math.pi), rng.uniform(0.7, 1.0), rng.uniform(*cond.rim_strike_depth)))
+        else:
+            strike = (rng.uniform(*cond.primer_strike_radius) * case.primer_cup_dia / 4.45, rng.uniform(*cond.primer_strike_depth))
+        if rng.random() < cond.extractor_nick_chance and not case.rimfire:
+            rim_dents.append(Dent(case.rim_thickness * 0.6, rng.uniform(0, 2 * math.pi), rng.uniform(0.35, 0.6), rng.uniform(0.04, 0.12)))
 
     bullet_dents = []
     if rng.random() < cond.tip_ding_chance:
@@ -228,15 +303,21 @@ def realize(cart: Cartridge, seed: int, kind: str = "loaded", condition: str = "
     return Copy(
         seed=seed,
         kind=kind,
+        condition=condition,
         case=case,
         bullet=bullet,
         seat_depth=seat,
         oal=oal,
         crimp=crimp,
         case_dents=case_dents,
+        rim_dents=rim_dents,
         bullet_dents=bullet_dents,
         ovality=(rng.uniform(*cond.ovality), rng.uniform(0, math.pi)),
         runout=(abs(rng.gauss(0, cond.runout_sd)) if kind == "loaded" else 0.0, rng.uniform(0, 2 * math.pi)),
+        primer_strike=strike,
+        dirt=rng.uniform(*cond.dirt),
+        soot_in=rng.uniform(*cond.soot_in),
+        soot_out=rng.uniform(*cond.soot_out) if case.bottleneck or rng.random() < 0.5 else 0.0,
         headstamp_seed=rng.randrange(1 << 30),
     )
 
@@ -255,11 +336,13 @@ def _dent_offset(dents, r, z, theta):
 
 
 def case_offset(cp: Copy, r: float, z: float, theta: float) -> float:
-    """Radial offset (mm) at a case surface point: dents and out-of-round on the body."""
+    """Radial offset (mm) at a case surface point: dents, out-of-round, rim damage."""
     c = cp.case
+    if cp.rim_dents and z <= c.rim_thickness + 0.05 and r > c.rim_dia / 2 - 0.6:
+        return _dent_offset(cp.rim_dents, r, z, theta)
     lo = (c.groove_top or c.rim_thickness) + 0.3
     if z < lo or r < 0.55 * c.base_dia / 2:
-        return 0.0  # leave the head, rim, pocket and web alone
+        return 0.0  # leave the head, pocket and web alone
     amp, phase = cp.ovality
     w = min(1.0, (z - lo) / max(c.length - lo, 1e-6))
     return amp * w * w * math.cos(2 * (theta - phase)) + _dent_offset(cp.case_dents, r, z, theta)

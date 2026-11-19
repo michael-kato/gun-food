@@ -143,6 +143,7 @@ def generate() -> str:
         out.append(f"| {label} | " + " | ".join(cells) + " |")
 
     cond = variation.CONDITIONS["new"]
+    fired = variation.CONDITIONS["fired"]
     out += [
         "",
         "## Variation between copies",
@@ -165,6 +166,12 @@ def generate() -> str:
         f"- Factory-new handling damage: about {cond.dents_per_10mm:g} dents per 10 mm of case, "
         f"{_num(cond.dent_depth[0])}–{_num(cond.dent_depth[1])} mm deep; up to {_num(cond.ovality[1])} mm out-of-round at the mouth;",
         f"  a {cond.mouth_ding_chance:.0%} chance of a dinged mouth on empty cases; bullet runout with a {cond.runout_sd}° SD tilt.",
+        "- Fired cases (`fired` condition): body grows "
+        f"{_num(fired.body_growth[0])}–{_num(fired.body_growth[1])} mm and neck {_num(fired.neck_growth[0])}–{_num(fired.neck_growth[1])} mm on diameter "
+        "toward the chamber, crimp gone, shoulder up to "
+        f"{_num(fired.shoulder_forward[1])} mm forward; firing-pin crater {_num(fired.primer_strike_depth[0])}–{_num(fired.primer_strike_depth[1])} mm deep "
+        "(rimfire: crushed rim); extractor nick; dents up to "
+        f"{_num(fired.dent_depth[1])} mm deep from rocks and boots; soot inside and blow-by outside; dirt.",
         "",
         "Sources for the spread: [new brass lot lengths](https://thefiringline.com/forums/showthread.php?p=2300477),",
         "[factory 9mm length variation](https://purple.thefiringline.com/goto/post?id=6804786),",

@@ -143,6 +143,24 @@ def test_dents_push_inward_on_the_body_only():
     assert variation.case_offset(cp, r, 0.5, 0.0) == 0.0  # head untouched
 
 
+def test_fired_cases():
+    for cart in CARTS:
+        for i in range(10):
+            cp = variation.realize(cart, variation.copy_seed(1, cart.key, "fired", i), "fired")
+            new = variation.realize(cart, variation.copy_seed(1, cart.key, "fired", i), "case")
+            assert cp.condition == "fired" and cp.crimp is None, cart.key
+            assert cp.case.base_dia > new.case.base_dia, (cart.key, "fired brass grows to the chamber")
+            assert cp.soot_in > 0 and cp.dirt > new.dirt, cart.key
+            if cart.case.rimfire:
+                assert cp.primer_strike is None and cp.rim_dents, cart.key  # firing pin crushes the rim
+            else:
+                assert cp.primer_strike is not None, cart.key
+                pts = profiles.primer_profile(cp.case, strike=cp.primer_strike)
+                _assert_simple_loop(pts, f"{cart.key} struck primer")
+                assert max(p[1] for p in pts if p[0] < 0.05) > 0.08 + 0.1, cart.key  # crater below the face
+            _assert_simple_loop(profiles.case_profile(cp.case), f"{cart.key} fired case")
+
+
 def test_bad_spec_is_rejected():
     bad = (specs.SPEC_DIR / "9mm.toml").read_text(encoding="utf-8").replace("oal = 29.21", "oal = 40.0")
     with tempfile.TemporaryDirectory() as d:

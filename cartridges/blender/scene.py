@@ -26,7 +26,7 @@ from .mesh import (
 
 GAP = 10.0  # mm between groups
 CLEARANCE = 0.15  # mm between neighbours inside a group
-GROUP_KINDS = ("loaded", "case")
+GROUP_KINDS = ("loaded", "case", "fired")
 REFINE = 0.6  # mm, longest profile segment (dents need vertices to move)
 
 
@@ -149,10 +149,12 @@ def bullet_mesh(cp: variation.Copy, name: str) -> bpy.types.Mesh:
     return me
 
 
-def primer_mesh(cart) -> bpy.types.Mesh | None:
+def primer_mesh(cart, cp: variation.Copy | None = None, name: str | None = None) -> bpy.types.Mesh | None:
+    """Shared unfired primer per cartridge, or a per-copy one with a firing-pin crater."""
     if cart.case.rimfire:
         return None
-    me = lathe(f"{cart.key}.primer", profiles.primer_profile(cart.case), PRIMER_SEGMENTS)
+    strike = cp.primer_strike if cp else None
+    me = lathe(name or f"{cart.key}.primer", profiles.primer_profile(cart.case, strike=strike), PRIMER_SEGMENTS)
     me.materials.append(metal_material(cart.case.primer_cup))
     return me
 
@@ -177,22 +179,23 @@ def make_copy(coll, name, cart, cp: variation.Copy, primer, location, rot_z, sta
         coll.objects.link(ob)
         return ob
 
-    if cp.kind in ("loaded", "case"):
+    if cp.kind in ("loaded", "case", "fired"):
         me, solver = case_mesh(cart, cp, f"{name}.case")
         stats.setdefault("headstamp", {}).setdefault(cart.key, set()).add(solver)
         case_ob = child(me, "case")
-        if cp.case.bottleneck:  # annealing stain on neck and shoulder (see materials.py)
-            rng = random.Random(cp.seed ^ 0x5A5A)
-            case_ob["anneal_z0"] = cp.case.shoulder_start - 6.0
-            case_ob["anneal_z1"] = cp.case.shoulder_start - 1.5
-            case_ob["anneal_amt"] = rng.uniform(0.05, 0.3)
+        # material drivers in the object colour (see materials.py): dirt, soot in, soot out, anneal
+        anneal = random.Random(cp.seed ^ 0x5A5A).uniform(0.05, 0.3) if cp.case.bottleneck else 0.0
+        case_ob.color = (cp.dirt, cp.soot_in, cp.soot_out, anneal)
+        if cp.kind == "fired" and not cart.case.rimfire:
+            primer = primer_mesh(cart, cp, f"{name}.primer")
         if primer:
-            child(primer, "primer")
+            child(primer, "primer").color = (cp.dirt * (0.6 if cp.kind == "fired" else 1.0), 0.0, 0.0, 0.0)
     if cp.kind == "loaded":
         tilt, az = math.radians(cp.runout[0]), cp.runout[1]
-        child(bullet_mesh(cp, f"{name}.bullet"), "bullet", (cp.case.length - cp.seat_depth) * MM, (tilt * math.cos(az), tilt * math.sin(az), 0.0))
+        bl = child(bullet_mesh(cp, f"{name}.bullet"), "bullet", (cp.case.length - cp.seat_depth) * MM, (tilt * math.cos(az), tilt * math.sin(az), 0.0))
+        bl.color = (cp.dirt, 0.0, 0.0, 0.0)
     if cp.kind == "bullet":
-        child(bullet_mesh(cp, f"{name}.bullet"), "bullet")
+        child(bullet_mesh(cp, f"{name}.bullet"), "bullet").color = (cp.dirt, 0.0, 0.0, 0.0)
     stats.setdefault("copies", []).append((cart, cp, root))
     return root
 
@@ -205,6 +208,8 @@ def _group_dia(cart, kind):
         return cart.max_dia
     if kind == "case":
         return max(cart.case.rim_dia, cart.case.base_dia)
+    if kind == "fired":  # expanded to the chamber, plus out-of-round
+        return max(cart.case.rim_dia, cart.case.base_dia) + 0.3
     return cart.bullet.dia
 
 
@@ -217,8 +222,8 @@ def _group_extent(dia):
     return 2 * pitch + dia, 2 * pitch * math.sin(math.radians(60)) + dia
 
 
-def build_layout(carts, seed=1, columns=3, condition="new"):
-    """Tight hex groups of 7 per kind (loaded rounds, primed cases), GAP mm apart.
+def build_layout(carts, seed=1, columns=3, condition=None):
+    """Tight hex groups of 7 per kind (loaded rounds, new primed cases, fired cases), GAP mm apart.
 
     Every copy is a separate seeded sample (``variation.realize``), so no two are identical,
     and the same ``seed`` always rebuilds the same scene.
@@ -233,6 +238,7 @@ def build_layout(carts, seed=1, columns=3, condition="new"):
     for cart in carts:
         sizes = [_group_extent(_group_dia(cart, k)) for k in GROUP_KINDS]
         blocks.append((cart, sizes, sum(w for w, _ in sizes) + GAP * (len(sizes) - 1), max(d for _, d in sizes)))
+    columns = max(1, min(columns, len(blocks)))
     rows = [blocks[i : i + columns] for i in range(0, len(blocks), columns)]
     col_w = [max(r[c][2] for r in rows if c < len(r)) for c in range(columns)]
     row_d = [max(b[3] for b in r) for r in rows]
@@ -350,7 +356,7 @@ def dimension_report(carts, stats) -> str:
         bad = 0
         n = 0
         for c2, cp, root in stats.get("copies", []):
-            if c2.key != cart.key:
+            if c2.key != cart.key or cp.kind == "fired":  # fired brass has grown to the chamber
                 continue
             n += 1
             parts = {ob.name.rsplit(".", 1)[1]: ob for ob in root.children}
@@ -397,6 +403,7 @@ def render(path, samples=None):
     scene.render.image_settings.file_format = "JPEG" if jpeg else "PNG"
     if jpeg:
         scene.render.image_settings.quality = 90
+    bpy.context.view_layer.update()  # parts made after the last render need their object colour synced
     bpy.ops.render.render()
     bpy.data.images["Render Result"].save_render(filepath=str(path.resolve()))
 
@@ -450,6 +457,31 @@ def render_details(carts, out_dir, seed=1):
     scene.camera = cam
     scene.render.resolution_x, scene.render.resolution_y = 3000, 360
     render(out_dir / "headstamps.jpg", samples=96)
+
+    # fired cases lying on their sides, mouths toward the camera: soot inside, dirt outside
+    for ob in list(temp.objects):
+        if ob.type != "CAMERA":
+            bpy.data.objects.remove(ob)
+    turn = math.radians(40)  # mouths angled toward the camera so the inside shows
+    x = 0.0
+    for cart in carts:
+        d = max(cart.case.rim_dia, cart.case.base_dia) + 0.3
+        foot = max(d, cart.case.length * math.sin(turn))
+        x += foot / 2
+        cp = variation.realize(cart, variation.copy_seed(seed, cart.key, "fired-detail"), "fired")
+        # lying on its side; the head sits back and to the left, the mouth forward and right
+        cx, cy = x - cart.case.length / 2 * math.sin(turn), cart.case.length / 2 * math.cos(turn)
+        root = make_copy(temp, f"_fired.{cart.key}", cart, cp, primer_mesh(cart), (cx * MM, cy * MM, d / 2 * MM), 0.0, stats)
+        root.rotation_euler = (math.pi / 2, 0.0, turn)  # axis runs (+sin, -cos): mouth forward and right
+        x += foot / 2 + 5.0
+    width = x - 5.0
+    for ob in temp.objects:
+        if ob.parent is None and ob.type == "EMPTY":
+            ob.location.x -= width / 2 * MM
+    cam = _ortho_cam("_cam_fired", (0, -1.0, 0.75), (0, 0.0, 0.004), width * 1.08 * MM)
+    scene.camera = cam
+    scene.render.resolution_x, scene.render.resolution_y = 2400, 1000
+    render(out_dir / "fired.jpg", samples=96)
 
     main.hide_render = False
     scene.camera = bpy.data.objects["Cam_Overview"]

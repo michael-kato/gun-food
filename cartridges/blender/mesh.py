@@ -284,14 +284,27 @@ def _arrays(me):
     return r, co[:, 2], radial, nor[:, 2]
 
 
-def _store(me, values):
-    attr = me.attributes.get("cavity") or me.attributes.new("cavity", "FLOAT", "POINT")
+def _store(me, values, name="cavity"):
+    attr = me.attributes.get(name) or me.attributes.new(name, "FLOAT", "POINT")
     attr.data.foreach_set("value", values.astype(np.float32))
 
 
 def case_cavity(me, case, region) -> None:
-    """Bake where grime and shadowed recesses are: stamp letters, primer gap, groove, inside."""
+    """Bake vertex attributes for the shader.
+
+    ``cavity``: where grime and shadow collect (stamp letters, primer gap, groove, inside).
+    ``interior``: 1 on the inside walls and floor, where a fired case carries soot.
+    ``zn``: height along the case, 0 at the head and 1 at the mouth (soot gradients).
+    ``anneal``: the band on rifle necks and shoulders that shows annealing colour.
+    """
     r, z, radial, nz = _arrays(me)
+    floor = case.web if case.rimfire else case.pocket_depth + case.web
+    inside = (z > floor - 0.2) & ((radial < -0.3) | ((nz > 0.5) & (z < case.length - 1.0) & (r < case.base_dia / 2 - 0.3)))
+    _store(me, inside.astype(np.float32), "interior")
+    _store(me, np.clip(z / case.length, 0.0, 1.0), "zn")
+    if case.bottleneck:
+        t = np.clip((z - (case.shoulder_start - 6.0)) / 4.5, 0.0, 1.0)
+        _store(me, t * t * (3 - 2 * t), "anneal")
     cav = np.zeros(len(r))
     cav = np.where((radial < -0.5) & (z > case.pocket_depth + 0.1), 0.5, cav)  # inside the case
     if not case.rimfire:

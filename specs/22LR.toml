@@ -1,0 +1,34 @@
+# .22 Long Rifle. Millimetres.
+name = ".22 Long Rifle"
+key = "22LR"
+order = 9
+
+[case]
+length = 15.57          # .613 in
+base_dia = 5.74         # .226 in
+mouth_dia = 5.74        # .226 in
+rim_dia = 7.06          # .278 in
+rim_thickness = 1.09    # .043 in
+primer = "rimfire"
+web = 0.35              # head thickness
+mouth_wall = 0.25
+
+[bullet]
+description = "40 gr copper-plated round nose (heeled)"
+dia = 5.72              # .2255 in, same as the case outside
+length = 13.13          # 9.83 exposed + heel
+nose_length = 5.60
+meplat_dia = 1.80
+heel_dia = 5.20
+jacket = "copper"
+
+[loaded]
+oal = 25.40             # 1.000 in
+
+[headstamp]
+center = "M"            # placeholder maker mark (raised)
+
+[sources]
+case = "Wikipedia .22 Long Rifle infobox (inch values converted) — https://en.wikipedia.org/wiki/.22_Long_Rifle"
+oal = "same as case"
+bullet = "typical 40 gr plated LRN, not a standard"

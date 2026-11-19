@@ -1,0 +1,33 @@
+# .380 ACP (9×17mm). Millimetres.
+name = ".380 ACP"
+key = "380ACP"
+order = 5
+
+[case]
+length = 17.27          # .680 in
+base_dia = 9.50         # .374 in
+mouth_dia = 9.47        # .373 in
+rim_dia = 9.50          # .374 in
+rim_thickness = 1.14    # .045 in
+primer = "small-pistol"
+web = 1.5
+
+[bullet]
+description = "95 gr FMJ round nose"
+dia = 9.01
+length = 11.30
+nose_length = 6.20
+meplat_dia = 2.20
+exposed_base = 0.75
+
+[loaded]
+oal = 24.99             # .984 in
+
+[headstamp]
+top = "CMX"
+bottom = "380 AUTO"
+
+[sources]
+case = "Wikipedia .380 ACP infobox (inch values converted) — https://en.wikipedia.org/wiki/.380_ACP"
+oal = "same as case"
+bullet = "typical 95 gr FMJ RN, not a standard"

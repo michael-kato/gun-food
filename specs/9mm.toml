@@ -1,0 +1,33 @@
+# 9×19mm Parabellum (9mm Luger). Millimetres.
+name = "9mm Luger"
+key = "9mm"
+order = 1
+
+[case]
+length = 19.15         # L3
+base_dia = 9.93        # P1 (tapered case)
+mouth_dia = 9.65       # H1
+rim_dia = 9.96         # R1
+rim_thickness = 1.27   # R
+primer = "small-pistol"
+web = 1.6
+
+[bullet]
+description = "115 gr FMJ round nose"
+dia = 9.01
+length = 14.50
+nose_length = 7.20
+meplat_dia = 2.40
+exposed_base = 0.75
+
+[loaded]
+oal = 29.69            # L6
+
+[headstamp]
+top = "CMX"            # placeholder maker mark
+bottom = "9mm LUGER"
+
+[sources]
+case = "Wikipedia 9×19mm Parabellum infobox; drawing captioned 'maximum C.I.P. cartridge dimensions' — https://en.wikipedia.org/wiki/9%C3%9719mm_Parabellum"
+oal = "same as case"
+bullet = "typical 115 gr FMJ RN, not a standard"

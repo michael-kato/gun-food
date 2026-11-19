@@ -1,0 +1,33 @@
+# .45 ACP (.45 Auto). Millimetres.
+name = ".45 ACP"
+key = "45ACP"
+order = 3
+
+[case]
+length = 22.81          # .898 in
+base_dia = 12.09        # .476 in
+mouth_dia = 12.01       # .473 in
+rim_dia = 12.19         # .480 in
+rim_thickness = 1.24    # .049 in
+primer = "large-pistol"
+web = 1.7
+
+[bullet]
+description = "230 gr FMJ round nose"
+dia = 11.48
+length = 17.30
+nose_length = 9.00
+meplat_dia = 3.00
+exposed_base = 0.75
+
+[loaded]
+oal = 32.39             # 1.275 in
+
+[headstamp]
+top = "CMX"
+bottom = "45 AUTO"
+
+[sources]
+case = "Wikipedia .45 ACP infobox (inch values converted) — https://en.wikipedia.org/wiki/.45_ACP"
+oal = "same as case"
+bullet = "typical 230 gr FMJ RN, not a standard"

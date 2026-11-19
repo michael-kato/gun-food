@@ -1,0 +1,43 @@
+# .223 Remington. Millimetres.
+name = ".223 Remington"
+key = "223"
+order = 2
+
+[case]
+length = 44.70          # L3
+base_dia = 9.58         # P1
+mouth_dia = 6.43        # H1
+rim_dia = 9.60          # R1
+rim_thickness = 1.14    # R
+shoulder_dia = 9.00     # P2
+shoulder_start = 36.52  # L1
+neck_start = 39.55      # L2 (shoulder half-angle 23°)
+neck_radius = 2.54      # r2
+groove_dia = 8.43       # E1
+groove_top = 3.13       # E
+primer = "small-rifle"
+web = 2.2
+mouth_wall = 0.29
+
+[bullet]
+description = "55 gr FMJ boat tail"
+dia = 5.70
+length = 18.80
+nose_length = 11.30
+meplat_dia = 0.90
+boattail_length = 1.50
+boattail_angle = 9.0
+cannelure = true
+exposed_base = 0.5
+
+[loaded]
+oal = 57.40             # L6
+
+[headstamp]
+top = "CMX"
+bottom = "223 REM"
+
+[sources]
+case = "C.I.P. TDCC 223 Rem., Tab. I, rev. 17-05-17 (cartridge maxi) — https://bobp.cip-bobp.org/uploads/tdcc/tab-i/223-rem-170406-en.pdf"
+oal = "same as case"
+bullet = "typical 55 gr FMJBT (M193 style), not a standard"

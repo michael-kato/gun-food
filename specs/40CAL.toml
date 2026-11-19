@@ -1,0 +1,33 @@
+# .40 S&W. Millimetres.
+name = ".40 S&W"
+key = "40CAL"
+order = 4
+
+[case]
+length = 21.59          # .850 in
+base_dia = 10.77        # .424 in
+mouth_dia = 10.74       # .423 in
+rim_dia = 10.77         # .424 in
+rim_thickness = 1.40    # .055 in
+primer = "small-pistol"
+web = 1.6
+
+[bullet]
+description = "180 gr FMJ flat point"
+dia = 10.16
+length = 15.00
+nose_length = 5.60
+meplat_dia = 5.60
+exposed_base = 0.75
+
+[loaded]
+oal = 28.83             # 1.135 in
+
+[headstamp]
+top = "CMX"
+bottom = "40 S&W"
+
+[sources]
+case = "Wikipedia .40 S&W infobox (inch values converted; drawing captioned C.I.P. maximum) — https://en.wikipedia.org/wiki/.40_S%26W"
+oal = "same as case"
+bullet = "typical 180 gr FMJ FP, not a standard"

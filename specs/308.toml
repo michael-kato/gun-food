@@ -1,0 +1,41 @@
+# .308 Winchester. Millimetres.
+name = ".308 Winchester"
+key = "308"
+order = 7
+
+[case]
+length = 51.18          # L3, 2.015 in
+base_dia = 11.96        # P1
+mouth_dia = 8.72        # H1
+rim_dia = 12.01         # R1
+rim_thickness = 1.37    # R
+shoulder_dia = 11.53    # P2
+shoulder_start = 39.62  # L1 — commonly cited 1.5598 in; not confirmed from the source
+shoulder_angle = 20.0   # half-angle from the source; L2 is derived from it
+primer = "large-rifle"
+web = 2.6
+mouth_wall = 0.33
+approx = ["shoulder_start"]
+
+[bullet]
+description = "150 gr FMJ boat tail"
+dia = 7.82
+length = 28.50
+nose_length = 17.00
+meplat_dia = 1.00
+boattail_length = 2.60
+boattail_angle = 9.0
+cannelure = true
+exposed_base = 0.5
+
+[loaded]
+oal = 71.12             # L6, 2.800 in
+
+[headstamp]
+top = "CMX"
+bottom = "308 WIN"
+
+[sources]
+case = "Wikipedia .308 Winchester infobox (drawing captioned C.I.P. maximum) — https://en.wikipedia.org/wiki/.308_Winchester"
+oal = "same as case"
+bullet = "typical 150 gr FMJBT (M80 style), not a standard"

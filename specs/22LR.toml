@@ -1,34 +1,35 @@
-# .22 Long Rifle. Millimetres.
+# .22 Long Rifle. Millimetres; case values are SAAMI maximums.
 name = ".22 Long Rifle"
 key = "22LR"
+class = "rimfire"
 order = 9
 
 [case]
-length = 15.57          # .613 in
+length = 15.57          # .613 -.008 in
+length_tol = 0.20
 base_dia = 5.74         # .226 in
-mouth_dia = 5.74        # .226 in
-rim_dia = 7.06          # .278 in
-rim_thickness = 1.09    # .043 in
+mouth_dia = 5.74
+body_dia_tol = 0.10     # -.004 in
+rim_dia = 7.06          # .278 -.012 in
+rim_dia_tol = 0.30
+rim_thickness = 1.09    # .043 -.007 in
+rim_thickness_tol = 0.18
 primer = "rimfire"
 web = 0.35              # head thickness
 mouth_wall = 0.25
 
-[bullet]
-description = "40 gr copper-plated round nose (heeled)"
-dia = 5.72              # .2255 in, same as the case outside
-length = 13.13          # 9.83 exposed + heel
-nose_length = 5.60
-meplat_dia = 1.80
-heel_dia = 5.20
-jacket = "copper"
-
 [loaded]
-oal = 25.40             # 1.000 in
+bullet = "224-40-lrn-plated"
+bullet_dia_max = 5.728  # .2255 -.004 in
+oal_min = 24.13         # .950 in
+oal_max = 25.40         # 1.000 in
+crimp = "roll"          # mouth crimped onto the bullet heel
+crimp_amount = 0.10
+crimp_length = 0.5
+approx = ["crimp_amount"]
 
 [headstamp]
 center = "M"            # placeholder maker mark (raised)
 
 [sources]
-case = "Wikipedia .22 Long Rifle infobox (inch values converted) — https://en.wikipedia.org/wiki/.22_Long_Rifle"
-oal = "same as case"
-bullet = "typical 40 gr plated LRN, not a standard"
+case = "ANSI/SAAMI Z299.1-2026, 22 Long Rifle - Sporting cartridge drawing (rev. 01/19/2025) — https://saami.org/wp-content/uploads/2026/05/SAAMI-Z299.1-R2026-Rimfire-FINAL-Approved-2026-05-08.pdf"

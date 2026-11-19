@@ -1,33 +1,41 @@
-# .380 ACP (9×17mm). Millimetres.
+# .380 Auto (9x17mm). Millimetres; case values are SAAMI maximums.
 name = ".380 ACP"
 key = "380ACP"
+class = "pistol"
 order = 5
 
 [case]
-length = 17.27          # .680 in
-base_dia = 9.50         # .374 in
-mouth_dia = 9.47        # .373 in
-rim_dia = 9.50          # .374 in
-rim_thickness = 1.14    # .045 in
+length = 17.27          # .680 -.010 in
+length_tol = 0.25
+base_dia = 9.497        # .3739 in
+mouth_dia = 9.474       # .3730 in
+body_dia_tol = 0.15     # -.006 in
+rim_dia = 9.50          # .374 -.010 in
+rim_dia_tol = 0.25
+rim_thickness = 1.14    # .045 -.010 in
+rim_thickness_tol = 0.25
+groove_dia = 8.36       # .329 -.010 in
+groove_dia_tol = 0.25
 primer = "small-pistol"
 web = 1.5
-
-[bullet]
-description = "95 gr FMJ round nose"
-dia = 9.01
-length = 11.30
-nose_length = 6.20
-meplat_dia = 2.20
-exposed_base = 0.75
+approx = ["groove_dia", "mouth_dia"]
 
 [loaded]
-oal = 24.99             # .984 in
+bullet = "355-95-fmj-rn"
+bullet_dia_max = 9.055  # .3565 -.003 in
+oal = 24.89             # typical factory 95 gr FMJ (.980 in)
+oal_min = 23.11         # .910 in
+oal_max = 24.99         # .984 in
+crimp = "taper"
+crimp_amount = 0.06
+crimp_length = 2.2
+approx = ["oal", "crimp_amount"]
 
 [headstamp]
 top = "CMX"
 bottom = "380 AUTO"
 
 [sources]
-case = "Wikipedia .380 ACP infobox (inch values converted) — https://en.wikipedia.org/wiki/.380_ACP"
-oal = "same as case"
-bullet = "typical 95 gr FMJ RN, not a standard"
+case = "ANSI/SAAMI Z299.3-2022, 380 Automatic cartridge drawing (rev. 07/09/2021) — https://saami.org/wp-content/uploads/2025/05/SAAMI-Z299.3-2022-Centerfire-Pistol-Revolver-Approved-12-13-2022.pdf"
+groove = "groove and mouth diameters read from the drawing text; positions not checked"
+crimp = "taper crimp to about bullet + 2 walls - .004 in — https://www.handgunsmag.com/editorial/squeeze-play-how-to-properly-crimp-ammunition/138116"

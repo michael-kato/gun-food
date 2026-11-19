@@ -1,0 +1,16 @@
+name = ".22 40 gr copper-plated round nose (heeled)"
+weight_gr = 40
+construction = "plated lead"
+dia = 5.728             # SAAMI 22 LR bullet max (.2255 in)
+dia_tol = 0.102
+length = 12.75
+nose_length = 5.60
+tip = "round"
+tip_dia = 2.40
+heel_dia = 5.20
+heel_length = 3.30
+jacket = "copper"
+
+[sources]
+dia = "ANSI/SAAMI Z299.1-2026, 22 Long Rifle - Sporting cartridge drawing — https://saami.org/wp-content/uploads/2026/05/SAAMI-Z299.1-R2026-Rimfire-FINAL-Approved-2026-05-08.pdf"
+shape = "typical 40 gr plated LRN, not a standard"

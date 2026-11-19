@@ -1,0 +1,16 @@
+name = ".224 55 gr FMJ boat tail"
+weight_gr = 55
+dia = 5.702             # SAAMI 223 Rem bullet max (.2245 in)
+dia_tol = 0.076
+length = 18.80
+nose_length = 11.30
+tip = "round"
+tip_dia = 0.90
+boattail_length = 1.50
+boattail_angle = 9.0
+cannelure_z = 6.25
+exposed_base = 0.5
+
+[sources]
+dia = "ANSI/SAAMI Z299.4-2025, 223 Remington cartridge drawing — https://saami.org/wp-content/uploads/2026/10/SAAMI-Z299.4-CFR-2025-Centerfire-Rifle-Approved-2-10-2025-2026-10-21.pdf"
+shape = "typical 55 gr FMJBT (M193 style), not a standard"

@@ -1,41 +1,44 @@
-# .300 AAC Blackout (300 BLK, 7.62×35). Millimetres.
+# .300 AAC Blackout (300 BLK). Millimetres; case values are SAAMI maximums.
 name = ".300 AAC Blackout"
 key = "300blackout"
+class = "rifle"
 order = 8
 
 [case]
-length = 34.75          # L3
-base_dia = 9.60         # P1
-mouth_dia = 8.48        # H1
-rim_dia = 9.60          # R1
-rim_thickness = 1.14    # R
-shoulder_dia = 9.16     # P2
-shoulder_start = 27.20  # L1
-neck_start = 28.00      # L2
-neck_radius = 1.27      # r2
-groove_dia = 8.43       # E1
-groove_top = 3.15       # E
+length = 34.75          # 1.368 -.020 in
+length_tol = 0.51
+base_dia = 9.548        # .3759 in
+mouth_dia = 8.48        # .334 in
+shoulder_dia = 9.162    # .3607 in
+shoulder_start = 27.195 # 1.0707 in
+neck_start = 27.992     # 1.1021 in
+neck_radius = 1.27
+body_dia_tol = 0.13     # -.005 in
+headspace_tol = 0.178   # -.0070 in
+rim_dia = 9.60          # .378 -.010 in
+rim_dia_tol = 0.25
+rim_thickness = 1.14    # .045 -.010 in
+rim_thickness_tol = 0.25
+groove_dia = 8.43       # .332 -.020 in
+groove_dia_tol = 0.51
+groove_top = 3.15       # C.I.P. E
 primer = "small-rifle"
 web = 2.2
 
-[bullet]
-description = "125 gr FMJ"
-dia = 7.82
-length = 24.60
-nose_length = 14.50
-meplat_dia = 1.00
-cannelure = true
-exposed_base = 0.75
-
 [loaded]
-oal = 53.34
-note = "typical factory length for 110–125 gr loads (2.100 in); the C.I.P. maximum L6 is 57.40, meant for long subsonic bullets"
+bullet = "308-125-fmj"  # the same .308 in bullets the 308 Winchester takes
+bullet_dia_max = 7.85   # .309 -.003 in
+oal_min = 45.21         # 1.780 in
+oal_max = 57.40         # 2.260 in
+crimp = "roll"
+crimp_amount = 0.15
+crimp_length = 0.6
+approx = ["crimp_amount"]
 
 [headstamp]
 top = "CMX"
 bottom = "300 AAC BLK"
 
 [sources]
-case = "C.I.P. TDCC 300 AAC Blackout, Tab. I, rev. 18-10-17 (cartridge maxi) — https://bobp.cip-bobp.org/uploads/tdcc/tab-i/300-aac-blackout-180801-en.pdf"
-oal = "typical factory load; see note"
-bullet = "typical 125 gr FMJ, not a standard"
+case = "ANSI/SAAMI Z299.4-2025, 300 AAC Blackout cartridge drawing (rev. 05/20/2022) — https://saami.org/wp-content/uploads/2026/10/SAAMI-Z299.4-CFR-2025-Centerfire-Rifle-Approved-2-10-2025-2026-10-21.pdf"
+groove_top = "C.I.P. TDCC 300 AAC Blackout — https://bobp.cip-bobp.org/uploads/tdcc/tab-i/300-aac-blackout-180801-en.pdf"

@@ -1,43 +1,45 @@
-# .223 Remington. Millimetres.
+# .223 Remington. Millimetres; case values are SAAMI maximums.
 name = ".223 Remington"
 key = "223"
+class = "rifle"
 order = 2
 
 [case]
-length = 44.70          # L3
-base_dia = 9.58         # P1
-mouth_dia = 6.43        # H1
-rim_dia = 9.60          # R1
-rim_thickness = 1.14    # R
-shoulder_dia = 9.00     # P2
-shoulder_start = 36.52  # L1
-neck_start = 39.55      # L2 (shoulder half-angle 23°)
-neck_radius = 2.54      # r2
-groove_dia = 8.43       # E1
-groove_top = 3.13       # E
+length = 44.70          # 1.760 -.030 in
+length_tol = 0.76
+base_dia = 9.548        # .3759 in
+mouth_dia = 6.43        # .253 in
+shoulder_dia = 8.997    # .3542 in
+shoulder_start = 36.527 # 1.4381 in
+neck_start = 39.555     # 1.5573 in
+neck_radius = 2.54
+body_dia_tol = 0.20     # -.008 in
+headspace_tol = 0.178   # -.0070 in
+rim_dia = 9.60          # .378 -.010 in
+rim_dia_tol = 0.25
+rim_thickness = 1.14    # .045 -.010 in
+rim_thickness_tol = 0.25
+groove_dia = 8.43       # .332 -.020 in
+groove_dia_tol = 0.51
+groove_top = 3.13       # C.I.P. E
 primer = "small-rifle"
 web = 2.2
 mouth_wall = 0.29
 
-[bullet]
-description = "55 gr FMJ boat tail"
-dia = 5.70
-length = 18.80
-nose_length = 11.30
-meplat_dia = 0.90
-boattail_length = 1.50
-boattail_angle = 9.0
-cannelure = true
-exposed_base = 0.5
-
 [loaded]
-oal = 57.40             # L6
+bullet = "224-55-fmjbt"
+bullet_dia_max = 5.702  # .2245 -.003 in
+oal_min = 53.98         # 2.125 in
+oal_max = 57.40         # 2.260 in
+crimp = "roll"
+crimp_amount = 0.15
+crimp_length = 0.6
+approx = ["crimp_amount"]
 
 [headstamp]
 top = "CMX"
 bottom = "223 REM"
 
 [sources]
-case = "C.I.P. TDCC 223 Rem., Tab. I, rev. 17-05-17 (cartridge maxi) — https://bobp.cip-bobp.org/uploads/tdcc/tab-i/223-rem-170406-en.pdf"
-oal = "same as case"
-bullet = "typical 55 gr FMJBT (M193 style), not a standard"
+case = "ANSI/SAAMI Z299.4-2025, 223 Remington cartridge drawing (rev. 09/25/2023) — https://saami.org/wp-content/uploads/2026/10/SAAMI-Z299.4-CFR-2025-Centerfire-Rifle-Approved-2-10-2025-2026-10-21.pdf"
+groove_top = "C.I.P. TDCC 223 Rem. — https://bobp.cip-bobp.org/uploads/tdcc/tab-i/223-rem-170406-en.pdf"

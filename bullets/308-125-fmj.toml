@@ -1,0 +1,14 @@
+name = ".308 125 gr FMJ"
+weight_gr = 125
+dia = 7.85              # SAAMI 308 Win / 300 BLK bullet max (.309 in)
+dia_tol = 0.08
+length = 24.60
+nose_length = 14.50
+tip = "round"
+tip_dia = 1.00
+cannelure_z = 6.00
+exposed_base = 0.75
+
+[sources]
+dia = "ANSI/SAAMI Z299.4-2025, 300 AAC Blackout cartridge drawing — https://saami.org/wp-content/uploads/2026/10/SAAMI-Z299.4-CFR-2025-Centerfire-Rifle-Approved-2-10-2025-2026-10-21.pdf"
+shape = "typical 125 gr FMJ, not a standard"

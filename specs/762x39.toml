@@ -1,40 +1,41 @@
-# 7.62×39mm. Millimetres.
+# 7.62x39mm. Millimetres; case values are SAAMI maximums.
 name = "7.62×39mm"
 key = "762x39"
+class = "rifle"
 order = 6
 
 [case]
-length = 38.70          # L3
-base_dia = 11.35        # P1
-mouth_dia = 8.60        # H1
-rim_dia = 11.35         # R1
-rim_thickness = 1.50    # R
-shoulder_dia = 10.07    # P2
-shoulder_start = 30.50  # L1 — not in the source; estimated
-shoulder_angle = 16.4   # half-angle from the source; L2 is derived from it
+length = 38.81          # 1.528 -.015 in
+length_tol = 0.38
+base_dia = 11.252       # .4430 in
+mouth_dia = 8.61        # .339 in
+shoulder_dia = 10.058   # .3960 in
+shoulder_start = 30.441 # 1.1985 in
+neck_start = 32.735     # 1.2888 in, shoulder half-angle 17.5 deg
+body_dia_tol = 0.20     # -.008 in
+headspace_tol = 0.178   # -.007 in
+rim_dia = 11.35         # .447 -.010 in
+rim_dia_tol = 0.25
+rim_thickness = 1.45    # .057 -.010 in
+rim_thickness_tol = 0.25
+groove_dia = 9.55       # .376 -.010 in
+groove_dia_tol = 0.25
 primer = "large-rifle"
 web = 2.4
-approx = ["shoulder_start"]
-
-[bullet]
-description = "123 gr FMJ boat tail"
-dia = 7.90
-length = 26.80
-nose_length = 15.80
-meplat_dia = 1.00
-boattail_length = 2.50
-boattail_angle = 10.0
-cannelure = true
-exposed_base = 0.5
 
 [loaded]
-oal = 56.00             # L6
+bullet = "311-123-fmjbt"
+bullet_dia_max = 7.90   # .311 -.002 in
+oal_min = 54.61         # 2.150 in
+oal_max = 55.88         # 2.200 in
+crimp = "roll"
+crimp_amount = 0.15
+crimp_length = 0.6
+approx = ["crimp_amount"]
 
 [headstamp]
 top = "CMX"
 bottom = "7.62x39"
 
 [sources]
-case = "Wikipedia 7.62×39mm infobox (drawing captioned C.I.P. maximum); bullet dia is SAAMI 7.85–7.90, C.I.P. 7.92 — https://en.wikipedia.org/wiki/7.62%C3%9739mm"
-oal = "same as case"
-bullet = "typical 123 gr FMJBT (M43 style), not a standard"
+case = "ANSI/SAAMI Z299.4-2025, 7.62x39 cartridge drawing (rev. 02/28/2022) — https://saami.org/wp-content/uploads/2026/10/SAAMI-Z299.4-CFR-2025-Centerfire-Rifle-Approved-2-10-2025-2026-10-21.pdf"

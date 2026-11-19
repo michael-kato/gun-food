@@ -1,21 +1,32 @@
 """2D half-profiles for lathe-revolved parts. Pure Python, millimetres.
 
-A profile is a list of ``(r, z, material_index)`` points. Revolved around the
-z axis it forms a closed solid: the segment from point *i* to point *i + 1*
-uses point *i*'s material index, and the last point joins back to the first.
-Points with ``r == 0`` sit on the axis and become a single vertex.
+A profile is a list of ``(r, z, material_index)`` points. Revolved around the z axis
+it forms a closed solid: the segment from point *i* to point *i + 1* uses point *i*'s
+material index, and the last point joins back to the first. Points with ``r == 0`` sit
+on the axis and become a single vertex.
 
-The case head is at z = 0 and the case extends toward +z.
+The case head is at z = 0 and the case extends toward +z. Bullets start at their base.
 """
 
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
-from .specs import BulletSpec, CaseSpec, Cartridge
+from .specs import BulletSpec, CaseSpec
 
 CASE_METAL = 0
 JACKET, CORE = 0, 1
+
+
+@dataclass(frozen=True)
+class Crimp:
+    kind: str  # "taper" or "roll"
+    amount: float  # reduction of the mouth's outside diameter, mm
+    length: float  # length over which the case is drawn in, mm
+
+
+# ---------------------------------------------------------------- helpers
 
 
 def _fillet_arc(a, p, b, radius, seg):
@@ -28,7 +39,7 @@ def _fillet_arc(a, p, b, radius, seg):
     ax, az, bx, bz = ax / la, az / la, bx / lb, bz / lb
     theta = math.acos(max(-1.0, min(1.0, ax * bx + az * bz)))
     if theta < 1e-3 or theta > math.pi - 1e-3:
-        return [p]  # straight through: nothing to round
+        return [p]
     t = min(radius / math.tan(theta / 2), 0.45 * la, 0.45 * lb)
     r = t * math.tan(theta / 2)
     t1 = (p[0] + ax * t, p[1] + az * t)
@@ -40,6 +51,7 @@ def _fillet_arc(a, p, b, radius, seg):
     a1 = math.atan2(t1[1] - c[1], t1[0] - c[0])
     a2 = math.atan2(t2[1] - c[1], t2[0] - c[0])
     da = (a2 - a1 + math.pi) % (2 * math.pi) - math.pi
+    seg = max(1, min(seg, math.ceil(abs(da) * r / 0.15)))  # about one point per 0.15 mm of arc
     return [(c[0] + r * math.cos(a1 + da * i / seg), c[1] + r * math.sin(a1 + da * i / seg)) for i in range(seg + 1)]
 
 
@@ -63,23 +75,58 @@ def round_corners(points, seg: int = 5):
     return deduped
 
 
-def case_profile(c: CaseSpec, seg: int = 5):
+def refine(profile, max_len: float, outside_only: bool = False):
+    """Split segments longer than ``max_len`` so surface detail (dents) has vertices to move.
+
+    Profiles run counter-clockwise, so outer surfaces are the segments that climb in z;
+    ``outside_only`` refines just those and leaves hidden inner walls coarse.
+    """
+    out = []
+    n = len(profile)
+    for i, (r, z, m) in enumerate(profile):
+        out.append((r, z, m))
+        r2, z2, _ = profile[(i + 1) % n]
+        if r < 1e-6 and r2 < 1e-6:
+            continue  # along the axis
+        if outside_only and z2 <= z:
+            continue
+        steps = int(math.hypot(r2 - r, z2 - z) / max_len)
+        for k in range(1, steps + 1):
+            t = k / (steps + 1)
+            out.append((r + (r2 - r) * t, z + (z2 - z) * t, m))
+    return out
+
+
+# ---------------------------------------------------------------- case
+
+
+def case_profile(c: CaseSpec, crimp: Crimp | None = None, seg: int = 5):
     R, t = c.rim_dia / 2, c.rim_thickness
     P1, H1, L = c.base_dia / 2, c.mouth_dia / 2, c.length
     mw = c.mouth_wall
     m = CASE_METAL
+    d = crimp.amount / 2 if crimp else 0.0
+    lc = crimp.length if crimp else 0.0
 
     if c.rimfire:
         head = c.web
         pts = [
             (0.0, 0.0, 0, m),
-            (R, 0.0, 0.30, m),
-            (R, t, 0.30, m),
-            (P1, t, 0.20, m),
-            (P1, L - 0.08, 0.0, m),
-            (P1 - 0.08, L, 0.0, m),
-            (P1 - mw + 0.05, L, 0.0, m),
-            (P1 - mw, L - 0.08, 0.0, m),
+            (R, 0.0, 0.18, m),
+            (R, t, 0.18, m),
+            (P1, t, 0.15, m),
+        ]
+        if crimp:
+            pts += [(P1, L - lc, 0.25, m)]
+        pts += [
+            (P1 - d, L - 0.08, 0, m),
+            (P1 - d - 0.08, L, 0, m),
+            (P1 - d - mw + 0.05, L, 0, m),
+            (P1 - d - mw, L - 0.08, 0, m),
+        ]
+        if crimp:
+            pts += [(P1 - mw, L - lc, 0.25, m)]
+        pts += [
             (P1 - mw, t + 0.10, 0.15, m),  # inner wall down into the folded rim
             (R - 0.30, t - 0.25, 0.15, m),
             (R - 0.30, head, 0.10, m),
@@ -91,15 +138,15 @@ def case_profile(c: CaseSpec, seg: int = 5):
     pd = c.pocket_depth
     fh = c.flash_hole_dia / 2
     floor = pd + c.web
-    f = 0.30 * t  # rim chamfer
+    f = c.rim_chamfer * t
     pts = [
         (fh, pd, 0, m),
         (rp, pd, 0.25, m),
-        (rp, 0.15, 0, m),
-        (rp + 0.15, 0.0, 0, m),  # pocket mouth chamfer
-        (R - f, 0.0, 0, m),
-        (R, f, 0, m),
-        (R, t, 0.06, m),
+        (rp, 0.15, 0.03, m),
+        (rp + 0.15, 0.0, 0.03, m),  # pocket mouth chamfer
+        (R - f, 0.0, 0.06, m),  # head-side rim chamfer, edges just broken
+        (R, f, 0.06, m),
+        (R, t, 0.10, m),
     ]
     if c.rimless:
         G, E = c.groove_dia / 2, c.groove_top
@@ -109,18 +156,22 @@ def case_profile(c: CaseSpec, seg: int = 5):
         if rim_dz + front_dz > room:
             k = room / (rim_dz + front_dz)
             rim_dz, front_dz = rim_dz * k, front_dz * k
-        pts += [(G, t + rim_dz, 0.12, m), (G, E - front_dz, 0.20, m), (P1, E, 0.40, m)]
+        pts += [(G, t + rim_dz, 0.10, m), (G, E - front_dz, 0.20, m), (P1, E, 0.35, m)]
     else:
-        pts += [(P1, t, 0.25, m)]
+        pts += [(P1, t, 0.30, m)]
     if c.bottleneck:
         P2 = c.shoulder_dia / 2
         pts += [(P2, c.shoulder_start, c.shoulder_radius, m), (H1, c.neck_start, c.neck_radius, m)]
+    if crimp:
+        pts += [(H1, L - lc, 0.30, m)]
     pts += [
-        (H1, L - 0.12, 0, m),
-        (H1 - 0.10, L, 0, m),  # mouth chamfer, outside
-        (H1 - mw + 0.06, L, 0, m),
-        (H1 - mw, L - 0.10, 0, m),  # mouth chamfer, inside
+        (H1 - d, L - 0.12, 0, m),
+        (H1 - d - 0.10, L, 0, m),  # mouth chamfer, outside
+        (H1 - d - mw + 0.06, L, 0, m),
+        (H1 - d - mw, L - 0.10, 0, m),  # mouth chamfer, inside
     ]
+    if crimp:
+        pts += [(H1 - mw, L - lc, 0.30, m)]
     if c.bottleneck:
         sw = mw + 0.12
         pts += [(H1 - mw, c.neck_start + 0.20, 0.8, m), (P2 - sw, c.shoulder_start + 0.20, 0.8, m)]
@@ -128,52 +179,84 @@ def case_profile(c: CaseSpec, seg: int = 5):
     return round_corners(pts, seg)
 
 
-def _ogive(r, m, z0, length, seg):
-    """Tangent ogive from radius r at z0 to meplat radius m at z0 + length."""
+# ---------------------------------------------------------------- bullet
+
+
+def _ogive_flat(r, m, z0, length, seg):
+    """Tangent ogive from radius r at z0 to a flat meplat of radius m at z0 + length."""
     a = r - m
     rho = (length**2 + a**2) / (2 * a)
     out = []
     for i in range(1, seg + 1):
-        dz = length * math.sin(i / seg * math.pi / 2)  # denser toward the tip
+        dz = length * math.sin(i / seg * math.pi / 2)
         out.append(((r - rho) + math.sqrt(max(rho**2 - dz**2, 0.0)), z0 + dz))
     out[-1] = (m, z0 + length)
     return out
 
 
-def bullet_profile(b: BulletSpec, seat_depth: float, seg: int = 32):
+def ogive_round(r, rt, z0, length):
+    """Tangent ogive capped by a sphere of radius ``rt``, total nose length ``length``.
+
+    Returns ``(rho, tangent_point, tip_centre_z)``: the ogive radius, where the ogive
+    meets the tip sphere, and the sphere's centre height.
+    """
+    rho = ((length - rt) ** 2 + r**2 - rt**2) / (2 * (r - rt))
+    zc = z0 + length - rt
+    co = (r - rho, z0)  # ogive centre
+    k = rho / (rho - rt)
+    tangent = (co[0] + (0.0 - co[0]) * k, co[1] + (zc - co[1]) * k)
+    return rho, tangent, zc
+
+
+def _ogive_round_points(r, rt, z0, length, seg):
+    rho, (pr, pz), zc = ogive_round(r, rt, z0, length)
+    a1 = math.atan2(pz - z0, pr - (r - rho))
+    out = []
+    n1 = max(4, int(seg * 0.75))
+    for i in range(1, n1 + 1):
+        a = a1 * math.sin(i / n1 * math.pi / 2)
+        out.append((r - rho + rho * math.cos(a), z0 + rho * math.sin(a)))
+    b0 = math.atan2(pz - zc, pr)
+    n2 = max(4, seg - n1)
+    for i in range(1, n2 + 1):
+        b = b0 + (math.pi / 2 - b0) * i / n2
+        out.append((rt * math.cos(b), zc + rt * math.sin(b)))
+    out[-1] = (0.0, z0 + length)
+    return out
+
+
+def bullet_profile(b: BulletSpec, seat_depth: float | None = None, seg: int = 32):
     r, L = b.dia / 2, b.length
-    m = b.meplat_dia / 2
     J, C = JACKET, (CORE if b.exposed_base > 0 else JACKET)
     pts = []
     if b.heel_dia:
         hr = b.heel_dia / 2
-        pts += [(0.0, 0.0, 0, J), (hr, 0.0, 0.25, J), (hr, seat_depth - 0.15, 0.10, J), (r, seat_depth + 0.10, 0.10, J)]
+        hl = b.heel_length
+        pts += [(0.0, 0.0, 0, J), (hr, 0.0, 0.25, J), (hr, hl - 0.15, 0.10, J), (r, hl + 0.10, 0.10, J)]
     elif b.boattail_length:
         btr = r - b.boattail_length * math.tan(math.radians(b.boattail_angle))
         er = btr * b.exposed_base
-        if er > 0:
-            pts += [(0.0, 0.0, 0, C), (er, 0.0, 0, J)]
-        else:
-            pts += [(0.0, 0.0, 0, J)]
+        pts += [(0.0, 0.0, 0, C), (er, 0.0, 0, J)] if er > 0 else [(0.0, 0.0, 0, J)]
         pts += [(btr, 0.0, 0.25, J), (r, b.boattail_length, 0.40, J)]
     else:
         er = r * b.exposed_base
-        if er > 0:
-            pts += [(0.0, 0.0, 0, C), (er, 0.0, 0, J)]
-        else:
-            pts += [(0.0, 0.0, 0, J)]
+        pts += [(0.0, 0.0, 0, C), (er, 0.0, 0, J)] if er > 0 else [(0.0, 0.0, 0, J)]
         pts += [(r, 0.0, min(0.5, r * 0.12), J)]
-    if b.cannelure:
+    if b.cannelure_z is not None:
         w, d = b.cannelure_width, 0.10
-        cz = seat_depth - 0.35  # the case mouth covers the lower part of the groove
+        cz = b.cannelure_z
         pts += [(r, cz - w / 2, 0.05, J), (r - d, cz - w / 2 + 0.12, 0, J), (r - d, cz + w / 2 - 0.12, 0, J), (r, cz + w / 2, 0.05, J)]
     z_nose = L - b.nose_length
     pts.append((r, z_nose, 0, J))
-    ogive = _ogive(r, m, z_nose, b.nose_length, seg)
-    for i, (orr, oz) in enumerate(ogive):
-        last = i == len(ogive) - 1
-        pts.append((orr, oz, (min(0.35, m * 0.5) if (last and m > 0) else 0), J))
-    if m > 0:
+    if b.tip == "round":
+        for pr, pz in _ogive_round_points(r, b.tip_dia / 2, z_nose, b.nose_length, seg):
+            pts.append((pr, pz, 0, J))
+    else:
+        m = b.tip_dia / 2
+        ogive = _ogive_flat(r, m, z_nose, b.nose_length, seg)
+        for i, (orr, oz) in enumerate(ogive):
+            last = i == len(ogive) - 1
+            pts.append((orr, oz, min(0.6, m * 0.25) if last else 0, J))
         pts.append((0.0, L, 0, J))
     return round_corners(pts, seg=4)
 
@@ -183,11 +266,3 @@ def primer_profile(c: CaseSpec, recess: float = 0.08):
     rc = c.primer_cup_dia / 2
     pts = [(0.0, recess, 0, 0), (rc, recess, 0.25, 0), (rc, c.pocket_depth, 0, 0), (0.0, c.pocket_depth, 0, 0)]
     return round_corners(pts, seg=4)
-
-
-def cartridge_profiles(cart: Cartridge):
-    """Case, bullet and (centerfire) primer profiles plus the bullet's z offset when loaded."""
-    case = case_profile(cart.case)
-    bullet = bullet_profile(cart.bullet, cart.seat_depth)
-    primer = None if cart.case.rimfire else primer_profile(cart.case)
-    return case, bullet, primer, cart.case.length - cart.seat_depth

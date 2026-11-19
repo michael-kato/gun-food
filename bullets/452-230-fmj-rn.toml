@@ -1,0 +1,13 @@
+name = ".45 230 gr FMJ round nose"
+weight_gr = 230
+dia = 11.481            # SAAMI 45 Auto jacketed bullet max (.4520 in)
+dia_tol = 0.076
+length = 17.30
+nose_length = 9.20
+tip = "round"
+tip_dia = 4.00
+exposed_base = 0.75
+
+[sources]
+dia = "ANSI/SAAMI Z299.3-2022, 45 Auto cartridge drawing — https://saami.org/wp-content/uploads/2025/05/SAAMI-Z299.3-2022-Centerfire-Pistol-Revolver-Approved-12-13-2022.pdf"
+shape = "typical 230 gr FMJ RN, not a standard"

@@ -1,0 +1,13 @@
+name = "9mm 95 gr FMJ round nose"
+weight_gr = 95
+dia = 9.030             # .355 in bullets also fit .380 Auto (SAAMI max .3565 in)
+dia_tol = 0.076
+length = 11.30
+nose_length = 6.30
+tip = "round"
+tip_dia = 3.00
+exposed_base = 0.75
+
+[sources]
+dia = "ANSI/SAAMI Z299.3-2022 — https://saami.org/wp-content/uploads/2025/05/SAAMI-Z299.3-2022-Centerfire-Pistol-Revolver-Approved-12-13-2022.pdf"
+shape = "typical 95 gr FMJ RN, not a standard"

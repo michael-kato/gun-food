@@ -1,0 +1,16 @@
+name = ".311 123 gr FMJ boat tail"
+weight_gr = 123
+dia = 7.90              # SAAMI 7.62x39 bullet max (.311 in)
+dia_tol = 0.05          # SAAMI gives -.002 in for this one
+length = 26.80
+nose_length = 15.80
+tip = "round"
+tip_dia = 1.00
+boattail_length = 2.50
+boattail_angle = 10.0
+cannelure_z = 9.66
+exposed_base = 0.5
+
+[sources]
+dia = "ANSI/SAAMI Z299.4-2025, 7.62x39 cartridge drawing — https://saami.org/wp-content/uploads/2026/10/SAAMI-Z299.4-CFR-2025-Centerfire-Rifle-Approved-2-10-2025-2026-10-21.pdf"
+shape = "typical 123 gr FMJBT (M43 style), not a standard"

@@ -1,0 +1,13 @@
+name = "9mm 115 gr FMJ round nose"
+weight_gr = 115
+dia = 9.030             # SAAMI 9mm Luger bullet max (.3555 in)
+dia_tol = 0.076
+length = 14.50
+nose_length = 7.40
+tip = "round"
+tip_dia = 3.20
+exposed_base = 0.75
+
+[sources]
+dia = "ANSI/SAAMI Z299.3-2022, 9mm Luger cartridge drawing — https://saami.org/wp-content/uploads/2025/05/SAAMI-Z299.3-2022-Centerfire-Pistol-Revolver-Approved-12-13-2022.pdf"
+shape = "typical 115 gr FMJ RN, not a standard"

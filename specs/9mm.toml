@@ -1,33 +1,41 @@
-# 9×19mm Parabellum (9mm Luger). Millimetres.
+# 9mm Luger (9x19mm Parabellum). Millimetres; case values are SAAMI maximums.
 name = "9mm Luger"
 key = "9mm"
+class = "pistol"
 order = 1
 
 [case]
-length = 19.15         # L3
-base_dia = 9.93        # P1 (tapered case)
-mouth_dia = 9.65       # H1
-rim_dia = 9.96         # R1
-rim_thickness = 1.27   # R
+length = 19.15          # .754 -.010 in
+length_tol = 0.25
+base_dia = 9.931        # .3910 in
+mouth_dia = 9.653       # .3800 in
+body_dia_tol = 0.18     # -.007 in
+rim_dia = 10.01         # .394 -.010 in
+rim_dia_tol = 0.25
+rim_thickness = 1.27    # .050 -.010 in
+rim_thickness_tol = 0.25
+groove_dia = 8.81       # .347 -.020 in
+groove_dia_tol = 0.51
 primer = "small-pistol"
 web = 1.6
-
-[bullet]
-description = "115 gr FMJ round nose"
-dia = 9.01
-length = 14.50
-nose_length = 7.20
-meplat_dia = 2.40
-exposed_base = 0.75
+approx = ["groove_dia"]
 
 [loaded]
-oal = 29.69            # L6
+bullet = "355-115-fmj-rn"
+bullet_dia_max = 9.030  # .3555 -.003 in
+oal = 29.21             # typical factory 115 gr FMJ (1.150 in)
+oal_min = 25.40         # 1.000 in
+oal_max = 29.69         # 1.169 in
+crimp = "taper"
+crimp_amount = 0.06
+crimp_length = 2.5
+approx = ["oal", "crimp_amount"]
 
 [headstamp]
-top = "CMX"            # placeholder maker mark
+top = "CMX"             # placeholder maker mark
 bottom = "9mm LUGER"
 
 [sources]
-case = "Wikipedia 9×19mm Parabellum infobox; drawing captioned 'maximum C.I.P. cartridge dimensions' — https://en.wikipedia.org/wiki/9%C3%9719mm_Parabellum"
-oal = "same as case"
-bullet = "typical 115 gr FMJ RN, not a standard"
+case = "ANSI/SAAMI Z299.3-2022, 9mm Luger cartridge drawing (rev. 06/23/2021) — https://saami.org/wp-content/uploads/2025/05/SAAMI-Z299.3-2022-Centerfire-Pistol-Revolver-Approved-12-13-2022.pdf"
+groove = "read from the drawing text; its position on the drawing was not checked"
+crimp = "taper crimp to about bullet + 2 walls - .004 in; factory .45 measures .469-.472 in — https://www.handgunsmag.com/editorial/squeeze-play-how-to-properly-crimp-ammunition/138116, https://snipershide.com/shooting/threads/45-acp-taper-crimp-spec.6893857"

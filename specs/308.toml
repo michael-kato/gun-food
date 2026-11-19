@@ -1,41 +1,42 @@
-# .308 Winchester. Millimetres.
+# .308 Winchester. Millimetres; case values are SAAMI maximums.
 name = ".308 Winchester"
 key = "308"
+class = "rifle"
 order = 7
 
 [case]
-length = 51.18          # L3, 2.015 in
-base_dia = 11.96        # P1
-mouth_dia = 8.72        # H1
-rim_dia = 12.01         # R1
-rim_thickness = 1.37    # R
-shoulder_dia = 11.53    # P2
-shoulder_start = 39.62  # L1 — commonly cited 1.5598 in; not confirmed from the source
-shoulder_angle = 20.0   # half-angle from the source; L2 is derived from it
+length = 51.18          # 2.015 -.020 in
+length_tol = 0.51
+base_dia = 11.946       # .4703 in
+mouth_dia = 8.725       # .3435 in
+shoulder_dia = 11.532   # .4540 in
+shoulder_start = 39.620 # 1.5598 in
+neck_start = 43.475     # 1.7116 in
+body_dia_tol = 0.20     # -.008 in
+headspace_tol = 0.178   # -.007 in
+rim_dia = 12.01         # .473 -.010 in
+rim_dia_tol = 0.25
+rim_thickness = 1.37    # .054 -.010 in
+rim_thickness_tol = 0.25
+groove_dia = 10.39      # .409 -.020 in
+groove_dia_tol = 0.51
 primer = "large-rifle"
 web = 2.6
 mouth_wall = 0.33
-approx = ["shoulder_start"]
-
-[bullet]
-description = "150 gr FMJ boat tail"
-dia = 7.82
-length = 28.50
-nose_length = 17.00
-meplat_dia = 1.00
-boattail_length = 2.60
-boattail_angle = 9.0
-cannelure = true
-exposed_base = 0.5
 
 [loaded]
-oal = 71.12             # L6, 2.800 in
+bullet = "308-150-fmjbt"
+bullet_dia_max = 7.85   # .309 -.003 in
+oal_min = 63.25         # 2.490 in
+oal_max = 71.37         # 2.810 in
+crimp = "roll"
+crimp_amount = 0.15
+crimp_length = 0.6
+approx = ["crimp_amount"]
 
 [headstamp]
 top = "CMX"
 bottom = "308 WIN"
 
 [sources]
-case = "Wikipedia .308 Winchester infobox (drawing captioned C.I.P. maximum) — https://en.wikipedia.org/wiki/.308_Winchester"
-oal = "same as case"
-bullet = "typical 150 gr FMJBT (M80 style), not a standard"
+case = "ANSI/SAAMI Z299.4-2025, 308 Winchester cartridge drawing (rev. 06/03/2022) — https://saami.org/wp-content/uploads/2026/10/SAAMI-Z299.4-CFR-2025-Centerfire-Rifle-Approved-2-10-2025-2026-10-21.pdf"

@@ -1,0 +1,16 @@
+name = ".308 150 gr FMJ boat tail"
+weight_gr = 150
+dia = 7.85              # SAAMI 308 Win / 300 BLK bullet max (.309 in)
+dia_tol = 0.08
+length = 28.50
+nose_length = 17.00
+tip = "round"
+tip_dia = 1.00
+boattail_length = 2.60
+boattail_angle = 9.0
+cannelure_z = 8.73
+exposed_base = 0.5
+
+[sources]
+dia = "ANSI/SAAMI Z299.4-2025, 308 Winchester cartridge drawing — https://saami.org/wp-content/uploads/2026/10/SAAMI-Z299.4-CFR-2025-Centerfire-Rifle-Approved-2-10-2025-2026-10-21.pdf"
+shape = "typical 150 gr FMJBT (M80 style), not a standard"

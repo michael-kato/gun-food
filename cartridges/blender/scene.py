@@ -1,4 +1,4 @@
-"""Build the cartridge scene: parts, grouped layout, studio, cameras, checks and renders."""
+"""Build the cartridge scene: seeded copies, grouped layout, studio, checks and renders."""
 
 from __future__ import annotations
 
@@ -6,21 +6,34 @@ import math
 import random
 
 import bpy
+import numpy as np
 from mathutils import Vector
 
-from .. import profiles
+from .. import profiles, variation
 from .materials import ground_material, metal_material, studio_world
-from .mesh import MM, apply_boolean, headstamp_tool, lathe
+from .mesh import (
+    BULLET_SEGMENTS,
+    CASE_SEGMENTS,
+    MM,
+    PRIMER_SEGMENTS,
+    apply_boolean,
+    bullet_cavity,
+    case_cavity,
+    finish_shading,
+    headstamp_tools,
+    lathe,
+)
 
 GAP = 10.0  # mm between groups
 CLEARANCE = 0.15  # mm between neighbours inside a group
-GROUP_KINDS = ("loaded", "case", "bullet")
+GROUP_KINDS = ("loaded", "case")
+REFINE = 0.6  # mm, longest profile segment (dents need vertices to move)
 
 
 # ---------------------------------------------------------------- scene setup
 
 
-def reset_scene():
+def reset_scene(engine: str = "eevee"):
     for ob in list(bpy.data.objects):
         bpy.data.objects.remove(ob)
     for datas in (bpy.data.meshes, bpy.data.materials, bpy.data.cameras, bpy.data.lights, bpy.data.curves, bpy.data.collections):
@@ -32,27 +45,55 @@ def reset_scene():
     us.system = "METRIC"
     us.scale_length = 1.0
     us.length_unit = "MILLIMETERS"
-    scene.render.engine = "CYCLES"
-    cy = scene.cycles
-    cy.samples = 128
-    cy.adaptive_threshold = 0.02
-    cy.use_denoising = True
-    cy.denoiser = "OPENIMAGEDENOISE"
     scene.render.resolution_x, scene.render.resolution_y = 1920, 1080
     scene.render.film_transparent = False
-    # Don't write render metadata (file path, date, render time) into images.
-    for name in dir(scene.render):
+    for name in dir(scene.render):  # no file path, date or render time written into images
         if name.startswith("use_stamp"):
             try:
                 setattr(scene.render, name, False)
             except (AttributeError, TypeError):
                 pass
+    configure_cycles(scene)
+    configure_eevee(scene)
+    scene.render.engine = "CYCLES" if engine == "cycles" else "BLENDER_EEVEE"
     studio_world()
     return scene
 
 
+def _set(obj, name, value):
+    try:
+        setattr(obj, name, value)
+    except (AttributeError, TypeError, ValueError):
+        pass
+
+
+def configure_eevee(scene):
+    ee = scene.eevee
+    _set(ee, "taa_render_samples", 64)
+    _set(ee, "use_raytracing", True)  # metals need traced reflections of the ground and their neighbours
+    _set(ee, "ray_tracing_method", "SCREEN")
+    rto = getattr(ee, "ray_tracing_options", None)
+    if rto:
+        _set(rto, "resolution_scale", "1")
+        _set(rto, "trace_max_roughness", 0.5)
+        _set(rto, "screen_trace_quality", 0.5)
+        _set(rto, "screen_trace_thickness", 0.002)  # default 0.2 m treats rays passing behind small parts as hits
+    _set(ee, "use_shadows", True)
+    _set(ee, "shadow_ray_count", 2)
+    _set(ee, "shadow_step_count", 6)
+    _set(ee, "use_fast_gi", False)  # its horizon scan leaves halos beside small bright parts
+
+
+def configure_cycles(scene):
+    cy = scene.cycles
+    cy.samples = 128
+    cy.adaptive_threshold = 0.02
+    cy.use_denoising = True
+    cy.denoiser = "OPENIMAGEDENOISE"
+
+
 def use_gpu() -> str:
-    """Use the first GPU backend that has a device; fall back to CPU."""
+    """Cycles: use the first GPU backend that has a device; fall back to CPU."""
     scene = bpy.context.scene
     prefs = bpy.context.preferences.addons["cycles"].preferences
     for backend in ("OPTIX", "CUDA", "HIP", "ONEAPI", "METAL"):
@@ -77,60 +118,82 @@ def _collection(name, parent=None):
     return coll
 
 
-# ---------------------------------------------------------------- parts
+# ---------------------------------------------------------------- per-copy meshes
 
 
-def make_parts(cart):
-    """Shared mesh data for one cartridge: case (with headstamp), primer, bullet."""
-    case_p, bullet_p, primer_p, bullet_z = profiles.cartridge_profiles(cart)
-    case_me = lathe(f"{cart.key}_case", case_p, segments=128)
-    case_me.materials.append(metal_material(cart.case.material))
+def case_mesh(cart, cp: variation.Copy, name: str) -> tuple[bpy.types.Mesh, str]:
+    """Unique case mesh for one copy: sampled dimensions, crimp, dents, softened headstamp."""
+    prof = profiles.refine(profiles.case_profile(cp.case, cp.crimp), REFINE, outside_only=True)
+    me = lathe(name, prof, CASE_SEGMENTS, offset=lambda r, z, t: variation.case_offset(cp, r, z, t))
+    me.materials.append(metal_material(cp.case.material))
+    tools, region = headstamp_tools(cart, cp.case, random.Random(cp.headstamp_seed))
     solver = "none"
-    tool, op = headstamp_tool(cart)
-    if tool:
-        tmp = bpy.data.objects.new("_case", case_me)
+    if tools:
+        tmp = bpy.data.objects.new("_case", me)
         bpy.context.scene.collection.objects.link(tmp)
-        solver = apply_boolean(tmp, tool, op)
-        case_me = tmp.data
+        solver = "/".join(sorted({apply_boolean(tmp, tool, op) for tool, op in tools}))
+        me = tmp.data
         bpy.data.objects.remove(tmp)
-    bullet_me = lathe(f"{cart.key}_bullet", bullet_p, segments=96)
-    bullet_me.materials.append(metal_material(cart.bullet.jacket))
-    bullet_me.materials.append(metal_material(cart.bullet.core))
-    primer_me = None
-    if primer_p:
-        primer_me = lathe(f"{cart.key}_primer", primer_p, segments=64)
-        primer_me.materials.append(metal_material(cart.case.primer_cup))
-    return {"case": case_me, "bullet": bullet_me, "primer": primer_me, "bullet_z": bullet_z, "headstamp": solver}
+        finish_shading(me)
+    case_cavity(me, cp.case, region)
+    me.name = name
+    return me, solver
 
 
-def make_round(coll, name, cart, parts, kind, location, rot_z, rng):
-    """One item: a loaded round, a primed empty case, or a bullet. Children share mesh data."""
+def bullet_mesh(cp: variation.Copy, name: str) -> bpy.types.Mesh:
+    prof = profiles.refine(profiles.bullet_profile(cp.bullet), REFINE * 1.2, outside_only=True)
+    me = lathe(name, prof, BULLET_SEGMENTS, offset=(lambda r, z, t: variation.bullet_offset(cp, r, z, t)) if cp.bullet_dents else None)
+    me.materials.append(metal_material(cp.bullet.jacket))
+    me.materials.append(metal_material(cp.bullet.core))
+    bullet_cavity(me, cp.bullet)
+    return me
+
+
+def primer_mesh(cart) -> bpy.types.Mesh | None:
+    if cart.case.rimfire:
+        return None
+    me = lathe(f"{cart.key}.primer", profiles.primer_profile(cart.case), PRIMER_SEGMENTS)
+    me.materials.append(metal_material(cart.case.primer_cup))
+    return me
+
+
+def make_copy(coll, name, cart, cp: variation.Copy, primer, location, rot_z, stats):
+    """One item: a loaded round, a primed empty case, or a bullet."""
     root = bpy.data.objects.new(name, None)
     root.empty_display_type = "PLAIN_AXES"
     root.empty_display_size = 0.002
     root.location = location
     root.rotation_euler = (0.0, 0.0, rot_z)
+    for k, v in cp.labels().items():
+        root[k] = v
+    root["cartridge"] = cart.key
     coll.objects.link(root)
 
-    def child(me, part, z=0.0):
+    def child(me, part, z=0.0, rot=(0.0, 0.0, 0.0)):
         ob = bpy.data.objects.new(f"{name}.{part}", me)
         ob.parent = root
         ob.location = (0.0, 0.0, z)
+        ob.rotation_euler = rot
         coll.objects.link(ob)
         return ob
 
-    if kind in ("loaded", "case"):
-        case_ob = child(parts["case"], "case")
-        if cart.case.bottleneck:  # annealing stain on neck and shoulder (see materials.py)
-            case_ob["anneal_z0"] = cart.case.shoulder_start - 6.0
-            case_ob["anneal_z1"] = cart.case.shoulder_start - 1.5
-            case_ob["anneal_amt"] = rng.uniform(0.15, 0.55)
-        if parts["primer"]:
-            child(parts["primer"], "primer")
-    if kind == "loaded":
-        child(parts["bullet"], "bullet", parts["bullet_z"] * MM)
-    if kind == "bullet":
-        child(parts["bullet"], "bullet")
+    if cp.kind in ("loaded", "case"):
+        me, solver = case_mesh(cart, cp, f"{name}.case")
+        stats.setdefault("headstamp", {}).setdefault(cart.key, set()).add(solver)
+        case_ob = child(me, "case")
+        if cp.case.bottleneck:  # annealing stain on neck and shoulder (see materials.py)
+            rng = random.Random(cp.seed ^ 0x5A5A)
+            case_ob["anneal_z0"] = cp.case.shoulder_start - 6.0
+            case_ob["anneal_z1"] = cp.case.shoulder_start - 1.5
+            case_ob["anneal_amt"] = rng.uniform(0.05, 0.3)
+        if primer:
+            child(primer, "primer")
+    if cp.kind == "loaded":
+        tilt, az = math.radians(cp.runout[0]), cp.runout[1]
+        child(bullet_mesh(cp, f"{name}.bullet"), "bullet", (cp.case.length - cp.seat_depth) * MM, (tilt * math.cos(az), tilt * math.sin(az), 0.0))
+    if cp.kind == "bullet":
+        child(bullet_mesh(cp, f"{name}.bullet"), "bullet")
+    stats.setdefault("copies", []).append((cart, cp, root))
     return root
 
 
@@ -151,15 +214,20 @@ def _hex7(pitch):
 
 def _group_extent(dia):
     pitch = dia + CLEARANCE
-    return 2 * pitch + dia, 2 * pitch * math.sin(math.radians(60)) + dia  # width (x), depth (y)
+    return 2 * pitch + dia, 2 * pitch * math.sin(math.radians(60)) + dia
 
 
-def build_layout(carts, parts_by_key, columns=3, seed=7):
-    """Tight hex groups of 7 per kind, three groups per cartridge, GAP mm apart everywhere."""
+def build_layout(carts, seed=1, columns=3, condition="new"):
+    """Tight hex groups of 7 per kind (loaded rounds, primed cases), GAP mm apart.
+
+    Every copy is a separate seeded sample (``variation.realize``), so no two are identical,
+    and the same ``seed`` always rebuilds the same scene.
+    """
     rng = random.Random(seed)
     root = _collection("Cartridges")
     labels = _collection("Labels")
     labels.hide_render = True
+    stats: dict = {}
 
     blocks = []
     for cart in carts:
@@ -175,21 +243,22 @@ def build_layout(carts, parts_by_key, columns=3, seed=7):
     for ri, row in enumerate(rows):
         y_c = y_top - row_d[ri] / 2
         x_left = -total_w / 2
-        for ci, (cart, sizes, block_w, _) in enumerate(row):
+        for ci, (cart, sizes, _block_w, _) in enumerate(row):
             coll = _collection(cart.key, root)
-            parts = parts_by_key[cart.key]
+            primer = primer_mesh(cart)
             x = x_left
             for kind, (gw, _gd) in zip(GROUP_KINDS, sizes):
                 dia = _group_dia(cart, kind)
                 cx = x + gw / 2
                 for i, (dx, dy) in enumerate(_hex7(dia + CLEARANCE)):
+                    cp = variation.realize(cart, variation.copy_seed(seed, cart.key, kind, i), kind, condition)
                     loc = Vector(((cx + dx) * MM, (y_c + dy) * MM, 0.0))
-                    make_round(coll, f"{cart.key}.{kind}.{i}", cart, parts, kind, loc, rng.uniform(0, 2 * math.pi), rng)
+                    make_copy(coll, f"{cart.key}.{kind}.{i}", cart, cp, primer, loc, rng.uniform(0, 2 * math.pi), stats)
                 x += gw + GAP
             _label(labels, cart.name, (x_left + 1.0) * MM, (y_c - row_d[ri] / 2 - 2.0) * MM)
             x_left += col_w[ci] + GAP
         y_top -= row_d[ri] + GAP
-    return total_w, total_d
+    return total_w, total_d, stats
 
 
 def _label(coll, text, x, y):
@@ -214,11 +283,12 @@ def add_studio(width_mm, depth_mm):
     ground.data.materials.append(ground_material())
     _move(ground, coll)
 
-    def area(name, loc, power, size, colour=(1, 1, 1)):
+    def area(name, loc, power, sz, colour=(1, 1, 1)):
         light = bpy.data.lights.new(name, "AREA")
         light.energy = power
-        light.size = size
+        light.size = sz
         light.color = colour
+        light.use_shadow = True
         ob = bpy.data.objects.new(name, light)
         ob.location = loc
         _aim(ob, Vector((0, 0, 0)))
@@ -260,46 +330,59 @@ def _aim(ob, target):
 # ---------------------------------------------------------------- checks
 
 
-def measure(parts):
-    """Measure the generated meshes (mm)."""
-    def verts(me):
-        return [(math.hypot(v.co.x, v.co.y) / MM, v.co.z / MM) for v in me.vertices]
-
-    case = verts(parts["case"])
-    bullet = verts(parts["bullet"])
-    length = max(z for _, z in case)
-    return {
-        "case_length": length,
-        "rim_dia": 2 * max(r for r, z in case if z < 2.0),
-        "mouth_dia": 2 * max(r for r, z in case if length - 1.0 < z),
-        "bullet_dia": 2 * max(r for r, _ in bullet),
-        "bullet_length": max(z for _, z in bullet),
-        "oal": parts["bullet_z"] + max(z for _, z in bullet),
-    }
+def _rz(me):
+    co = np.empty(len(me.vertices) * 3)
+    me.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3) / MM
+    return np.hypot(co[:, 0], co[:, 1]), co[:, 2]
 
 
-def dimension_report(carts, parts_by_key) -> str:
+def dimension_report(carts, stats) -> str:
+    """Measure every generated copy and check it against its SAAMI band."""
     rows = [
-        "| Cartridge | Case length | Rim dia | Mouth dia | Bullet dia | OAL | Headstamp |",
-        "|---|---|---|---|---|---|---|",
+        "| Cartridge | Copies | Case length (band) | Rim dia (band) | Overall length (SAAMI) | Bullet dia (band) | Out of band | Headstamp |",
+        "|---|---|---|---|---|---|---|---|",
     ]
-    worst = 0.0
+    total_bad = 0
     for cart in carts:
-        m = measure(parts_by_key[cart.key])
-        pairs = [
-            (m["case_length"], cart.case.length),
-            (m["rim_dia"], cart.case.rim_dia),
-            (m["mouth_dia"], cart.case.mouth_dia),
-            (m["bullet_dia"], cart.bullet.dia),
-            (m["oal"], cart.oal),
-        ]
-        cells = []
-        for got, want in pairs:
-            worst = max(worst, abs(got - want))
-            cells.append(f"{got:.3f} / {want:.2f}")
-        rows.append(f"| {cart.name} | " + " | ".join(cells) + f" | {parts_by_key[cart.key]['headstamp']} |")
-    rows.append("")
-    rows.append(f"Measured from the generated meshes / spec value, mm. Largest difference: {worst:.4f} mm.")
+        k = cart.case
+        lens, rims, oals, bdias = [], [], [], []
+        bad = 0
+        n = 0
+        for c2, cp, root in stats.get("copies", []):
+            if c2.key != cart.key:
+                continue
+            n += 1
+            parts = {ob.name.rsplit(".", 1)[1]: ob for ob in root.children}
+            if "case" in parts:
+                r, z = _rz(parts["case"].data)
+                length = float(z.max())
+                rim = 2 * float(r[z < cp.case.rim_thickness].max())
+                lens.append(length)
+                rims.append(rim)
+                bad += not (k.length - cart.tol("length_tol") - 1e-3 <= length <= k.length + 1e-3)
+                bad += not (k.rim_dia - cart.tol("rim_dia_tol") - 1e-3 <= rim <= k.rim_dia + 1e-3)
+            if "bullet" in parts:
+                r, z = _rz(parts["bullet"].data)
+                bdia = 2 * float(r.max())
+                bdias.append(bdia)
+                bad += not (cart.bullet.dia - cart.bullet.dia_tol - 1e-3 <= bdia <= cart.bullet.dia + 1e-3)
+                if cp.kind == "loaded":
+                    oal = parts["bullet"].location.z / MM + float(z.max())
+                    oals.append(oal)
+                    bad += not (cart.oal_min - 1e-3 <= oal <= cart.oal_max + 1e-3)
+        total_bad += bad
+
+        def span(vals, lo, hi):
+            return f"{min(vals):.3f}–{max(vals):.3f} ({lo:.2f}–{hi:.2f})" if vals else "—"
+
+        rows.append(
+            f"| {cart.name} | {n} | {span(lens, k.length - cart.tol('length_tol'), k.length)} "
+            f"| {span(rims, k.rim_dia - cart.tol('rim_dia_tol'), k.rim_dia)} | {span(oals, cart.oal_min, cart.oal_max)} "
+            f"| {span(bdias, cart.bullet.dia - cart.bullet.dia_tol, cart.bullet.dia)} | {bad} "
+            f"| {', '.join(sorted(stats.get('headstamp', {}).get(cart.key, {'none'})))} |"
+        )
+    rows += ["", f"Measured from the generated meshes, mm. Copies outside their band: {total_bad}."]
     return "\n".join(rows)
 
 
@@ -318,25 +401,23 @@ def render(path, samples=None):
     bpy.data.images["Render Result"].save_render(filepath=str(path.resolve()))
 
 
-def render_details(carts, parts_by_key, out_dir):
+def render_details(carts, out_dir, seed=1):
     """Side-view lineup and head-on headstamp row, built in a temporary collection."""
     scene = bpy.context.scene
     main = bpy.data.collections["Cartridges"]
     main.hide_render = True
     temp = _collection("_detail")
-    rng = random.Random(1)
+    stats: dict = {}
     spacing = 6.0
 
-    # lineup: loaded rounds standing in a row, seen from the side
     x = 0.0
-    xs = []
     for cart in carts:
         x += cart.max_dia / 2
-        make_round(temp, f"_line.{cart.key}", cart, parts_by_key[cart.key], "loaded", (x * MM, 0, 0), 0.0, rng)
-        xs.append(x)
+        cp = variation.realize(cart, variation.copy_seed(seed, cart.key, "lineup"), "loaded")
+        make_copy(temp, f"_line.{cart.key}", cart, cp, primer_mesh(cart), (x * MM, 0, 0), 0.0, stats)
         x += cart.max_dia / 2 + spacing
     width = x - spacing
-    tallest = max(c.oal for c in carts)
+    tallest = max(c.oal_max for c in carts)
     for ob in temp.objects:
         if ob.parent is None:
             ob.location.x -= width / 2 * MM
@@ -345,14 +426,14 @@ def render_details(carts, parts_by_key, out_dir):
     scene.render.resolution_x, scene.render.resolution_y = 2000, 1000
     render(out_dir / "lineup.jpg", samples=96)
 
-    # heads: cases turned over, seen from above
     for ob in list(temp.objects):
         bpy.data.objects.remove(ob)
     x = 0.0
     for cart in carts:
         d = max(cart.case.rim_dia, cart.case.base_dia)
         x += d / 2
-        root = make_round(temp, f"_head.{cart.key}", cart, parts_by_key[cart.key], "case", ((x) * MM, 0, cart.case.length * MM), 0.0, rng)
+        cp = variation.realize(cart, variation.copy_seed(seed, cart.key, "head"), "case")
+        root = make_copy(temp, f"_head.{cart.key}", cart, cp, primer_mesh(cart), (x * MM, 0, cp.case.length * MM), 0.0, stats)
         root.rotation_euler = (math.pi, 0.0, math.pi)  # head up, headstamp upright in the top view
         x += d / 2 + 3.0
     width = x - 3.0
@@ -376,12 +457,19 @@ def render_details(carts, parts_by_key, out_dir):
 
 
 def _ortho_cam(name, loc, target, ortho_scale):
+    """Near-orthographic view from a long lens far away.
+
+    A true orthographic camera breaks EEVEE's screen-space reflections (copper smears beside
+    the parts), so this backs a 400 mm lens off until ``ortho_scale`` fills the frame.
+    """
     data = bpy.data.cameras.new(name)
-    data.type = "ORTHO"
-    data.ortho_scale = ortho_scale
-    data.clip_start = 0.001
+    data.lens = 400
+    data.clip_start = 0.01
+    data.clip_end = 100
+    dist = (ortho_scale / 2) / (data.sensor_width / 2 / data.lens)
+    loc, target = Vector(loc), Vector(target)
     cam = bpy.data.objects.new(name, data)
-    cam.location = loc
-    _aim(cam, Vector(target))
+    cam.location = target + (loc - target).normalized() * dist
+    _aim(cam, target)
     bpy.data.collections["_detail"].objects.link(cam)
     return cam

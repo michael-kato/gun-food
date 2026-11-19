@@ -100,13 +100,19 @@ specs/*.toml, bullets/*.toml ──▶ specs.py      load, fill defaults, valida
 - **Headstamps** are real geometry, stamped in two layers (a shallow full letter and a deeper,
   thinner core) for soft, rounded letter walls, with each letter's position, angle, size and
   depth jittered like a hand-set bunter. Rimfire marks are raised.
-- **Materials** share one node graph per metal (brass, gilding metal, copper, lead, nickel,
-  steel, aluminium): measured reflectance, F82 edge tint, tarnish, drawing marks, sparse
-  dings and micro-dents, plus dirt and soot layers. Everything a copy needs is either baked
-  into vertex attributes (`cavity` for recesses instead of costly ambient occlusion,
-  `interior`, `zn` height along the case, `anneal` band) or packed into the object colour
-  (R dirt, G soot inside, B soot outside, A annealing tint), which EEVEE reads as a plain
-  uniform. Set an object's colour to make it cleaner or filthier.
+- **Materials** are all instances of one shared node group, **`GF Metal`**: each metal
+  (brass, gilding metal, copper, lead, nickel, steel, aluminium) is a material holding just
+  that group with its own inputs (reflectance, F82 edge tint, roughness, tarnish, oxide
+  film, drawing marks, specks, micro-dents, annealing). Edit the group once and every metal
+  follows; every copy of a part shares its metal's material.
+- **Layered, not blended.** Inside the group, metal, soil and soot are three complete BSDFs
+  mixed as shader closures, like Unreal Substrate slabs: the masks only set coverage, so
+  mask edges never turn into half-metallic brass with a pale outline. The soil has its own
+  grain bump; soot is matte carbon.
+- **Per-copy drivers** are baked into vertex attributes (`cavity` for recesses instead of
+  costly ambient occlusion, `interior`, `zn` height along the case, `anneal` band) or
+  packed into the object colour (R dirt, G soot inside, B soot outside, A annealing), which
+  EEVEE reads as a plain uniform. Set an object's colour to make it cleaner or filthier.
 - **EEVEE setup:** screen-space ray tracing with a 2 mm trace thickness (the 0.2 m default
   smears copper beside millimetre-sized parts), shadows, no fast GI. Detail shots use a long
   lens instead of an orthographic camera, which also breaks screen-space reflections.

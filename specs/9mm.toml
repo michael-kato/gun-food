@@ -32,8 +32,7 @@ crimp_length = 2.5
 approx = ["oal", "crimp_amount"]
 
 [headstamp]
-top = "CMX"             # placeholder maker mark
-bottom = "9mm LUGER"
+caliber = "9mm LUGER"            # as commercial makers stamp it; makers.toml adds the rest
 
 [sources]
 case = "ANSI/SAAMI Z299.3-2022, 9mm Luger cartridge drawing (rev. 06/23/2021) — https://saami.org/wp-content/uploads/2025/05/SAAMI-Z299.3-2022-Centerfire-Pistol-Revolver-Approved-12-13-2022.pdf"

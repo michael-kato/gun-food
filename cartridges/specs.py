@@ -44,7 +44,9 @@ PRIMERS: dict[str, tuple[float, float]] = {
     "rimfire": (0.0, 0.0),
 }
 
-METALS = ("brass", "gilding-metal", "copper", "lead", "nickel", "steel", "aluminum")
+MAKERS_PATH = _BUNDLED / "makers.toml" if (_BUNDLED / "makers.toml").is_file() else ROOT / "makers.toml"
+
+METALS = ("brass", "gilding-metal", "copper", "lead", "nickel", "steel", "steel-polymer", "steel-lacquer", "aluminum")
 CRIMPS = ("none", "taper", "roll")
 
 # SAAMI's usual cartridge tolerances by class (mm), used when a spec doesn't list one.
@@ -146,10 +148,11 @@ class BulletSpec:
 
 @dataclass
 class HeadstampSpec:
-    top: str = ""
-    bottom: str = ""
-    center: str = ""  # rimfire: raised mark in the middle of the head
-    size: float | None = None  # letter height; default from head size
+    """The cartridge's part of a headstamp; makers (``makers.toml``) supply the rest."""
+
+    caliber: str = ""  # caliber marking as commercial makers stamp it ("223 REM")
+    military: str = ""  # as military makers stamp it ("5.56"); default: caliber
+    size: float | None = None  # letter height, mm; default from the head size
 
 
 @dataclass
@@ -360,6 +363,151 @@ def load(path: Path, bullets: dict[str, BulletSpec] | None = None) -> Cartridge:
         path=path,
     )
     return finalize(c)
+
+
+# ---------------------------------------------------------------- makers
+
+SYMBOLS = ("nato", "ring", "dot")
+PRIMER_CRIMPS = ("none", "ring", "stakes")
+PLACEHOLDERS = {"caliber": "C", "military": "M", "yy": "00", "code": "0"}
+
+
+@dataclass
+class Mark:
+    text: str = ""
+    symbol: str = ""
+    at: float = 12.0  # clock position; 0 = centre (rimfire)
+
+
+@dataclass
+class Style:
+    weight: float = 0.0  # stroke growth per side, fraction of letter height
+    width: float = 1.0
+    size: float = 1.0
+    depth: float = 1.0
+
+
+@dataclass
+class Maker:
+    """A headstamp layout plus the finishes that go with it (see ``makers.toml``)."""
+
+    key: str
+    name: str
+    marks: list[Mark]
+    classes: list[str] = field(default_factory=list)
+    weight: float = 1.0
+    weights: dict[str, float] = field(default_factory=dict)
+    case: dict[str, float] = field(default_factory=lambda: {"brass": 1.0})
+    primer: dict[str, float] = field(default_factory=dict)  # empty: the spec's primer cup
+    sealant: dict[str, float] = field(default_factory=lambda: {"none": 1.0})
+    smear: tuple[float, float] = (0.0, 0.0)
+    primer_crimp: str = "none"
+    dots: tuple[int, int] = (0, 0)
+    years: tuple[int, int] = (1990, 2026)
+    codes: list[str] = field(default_factory=list)
+    anneal: tuple[float, float] = (0.05, 0.35)
+    age: tuple[float, float] = (0.0, 0.4)
+    jacket: dict[str, float] = field(default_factory=dict)  # empty: the bullet's own
+    tip: dict[str, float] = field(default_factory=lambda: {"none": 1.0})
+    style: Style = field(default_factory=Style)
+
+    def weight_for(self, cart: Cartridge) -> float:
+        if cart.key in self.weights:
+            return self.weights[cart.key]
+        return self.weight if cart.cls in self.classes else 0.0
+
+
+@dataclass
+class Makers:
+    makers: dict[str, Maker]
+    sealants: dict[str, tuple[float, float, float]]
+    paints: dict[str, tuple[float, float, float]]
+
+    def for_cartridge(self, cart: Cartridge) -> dict[str, float]:
+        """{maker key: weight} of the makers that load ``cart``."""
+        return {k: w for k, m in self.makers.items() if (w := m.weight_for(cart)) > 0}
+
+
+def _rgb_table(data, where, name):
+    out = {}
+    for k, v in data.get(name, {}).items():
+        if not (isinstance(v, list) and len(v) == 3 and all(0 <= x <= 1 for x in v)):
+            raise SpecError(f"{where}: [{name}] {k} must be [r, g, b] in 0-1")
+        out[k] = tuple(v)
+    return out
+
+
+def load_makers(path: Path = MAKERS_PATH, cartridges: set[str] | None = None) -> Makers:
+    """Load and check ``makers.toml``. ``cartridges``: known keys, to catch typos in ``weights``."""
+    where = path.name
+    with open(path, "rb") as fh:
+        data = tomllib.load(fh)
+    sealants, paints = _rgb_table(data, where, "sealants"), _rgb_table(data, where, "paints")
+    makers = {}
+    for raw in data.get("maker", []):
+        raw = dict(raw)
+        key = raw.get("key")
+        if not key or key in makers:
+            raise SpecError(f"{where}: every [[maker]] needs a unique key (got {key!r})")
+        w = f"{where} maker {key}"
+        names = {f.name for f in fields(Maker)}
+        unknown = set(raw) - names
+        if unknown:
+            raise SpecError(f"{w}: unknown keys {sorted(unknown)}")
+        marks = []
+        for m in raw.pop("marks", []):
+            mk = Mark(**m)
+            if bool(mk.text) == bool(mk.symbol):
+                raise SpecError(f"{w}: each mark needs text or symbol")
+            if mk.symbol and mk.symbol not in SYMBOLS:
+                raise SpecError(f"{w}: unknown symbol {mk.symbol!r}; use one of {SYMBOLS}")
+            if not 0 <= mk.at <= 12:
+                raise SpecError(f"{w}: mark position 'at' is a clock position, 0-12")
+            try:
+                mk.text.format(**PLACEHOLDERS)
+            except (KeyError, IndexError, ValueError) as e:
+                raise SpecError(f"{w}: bad placeholder in {mk.text!r}; use {sorted(PLACEHOLDERS)}") from e
+            marks.append(mk)
+        if not marks:
+            raise SpecError(f"{w}: needs at least one mark")
+        style = Style(**raw.pop("style", {}))
+        for name in ("smear", "dots", "years", "anneal", "age"):
+            if name in raw:
+                raw[name] = tuple(raw[name])
+        mk = Maker(marks=marks, style=style, **raw)
+        bad = [c for c in mk.classes if c not in CLASSES]
+        if bad:
+            raise SpecError(f"{w}: unknown classes {bad}")
+        for metal in [*mk.case, *mk.primer, *mk.jacket]:
+            if metal not in METALS:
+                raise SpecError(f"{w}: unknown metal {metal!r}; use one of {METALS}")
+        for s in mk.sealant:
+            if s != "none" and s not in sealants:
+                raise SpecError(f"{w}: sealant {s!r} isn't in [sealants]")
+        for t in mk.tip:
+            if t != "none" and t not in paints:
+                raise SpecError(f"{w}: tip paint {t!r} isn't in [paints]")
+        if mk.primer_crimp not in PRIMER_CRIMPS:
+            raise SpecError(f"{w}: primer_crimp must be one of {PRIMER_CRIMPS}")
+        if "{code}" in "".join(m.text for m in marks) and not mk.codes:
+            raise SpecError(f"{w}: uses {{code}} but has no codes")
+        if cartridges is not None:
+            unknown = set(mk.weights) - cartridges
+            if unknown:
+                raise SpecError(f"{w}: weights name unknown cartridges {sorted(unknown)}")
+        makers[key] = mk
+    return Makers(makers, sealants, paints)
+
+
+_default_makers: Makers | None = None
+
+
+def default_makers() -> Makers:
+    """``makers.toml`` next to the specs, loaded once."""
+    global _default_makers
+    if _default_makers is None:
+        _default_makers = load_makers(MAKERS_PATH, {p.stem for p in SPEC_DIR.glob("*.toml")})
+    return _default_makers
 
 
 def load_all(spec_dir: Path = SPEC_DIR, keys: list[str] | None = None) -> list[Cartridge]:

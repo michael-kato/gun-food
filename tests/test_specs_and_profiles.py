@@ -150,7 +150,8 @@ def test_fired_cases():
             new = variation.realize(cart, variation.copy_seed(1, cart.key, "fired", i), "case")
             assert cp.condition == "fired" and cp.crimp is None, cart.key
             assert cp.case.base_dia > new.case.base_dia, (cart.key, "fired brass grows to the chamber")
-            assert cp.soot_in > 0 and cp.dirt > new.dirt, cart.key
+            assert cp.soot_in > 0 and cp.dirt >= 0.15, cart.key
+            assert cp.age >= 0.65 and cp.wear >= 0.45 and cp.lot == new.lot, (cart.key, "range brass is tarnished and scuffed")
             if cart.case.rimfire:
                 assert cp.primer_strike is None and cp.rim_dents, cart.key  # firing pin crushes the rim
             else:
@@ -159,6 +160,58 @@ def test_fired_cases():
                 _assert_simple_loop(pts, f"{cart.key} struck primer")
                 assert max(p[1] for p in pts if p[0] < 0.05) > 0.08 + 0.1, cart.key  # crater below the face
             _assert_simple_loop(profiles.case_profile(cp.case), f"{cart.key} fired case")
+
+
+def test_makers():
+    makers = specs.default_makers()
+    for cart in CARTS:
+        assert makers.for_cartridge(cart), f"{cart.key}: no maker"
+        seen = set()
+        for i in range(60):
+            for kind in ("loaded", "case", "fired"):
+                cp = variation.realize(cart, variation.copy_seed(3, cart.key, kind, i), kind)
+                lot = cp.lot
+                seen.add(lot.maker)
+                assert lot.maker in makers.for_cartridge(cart), (cart.key, lot.maker)
+                assert cp.case.material == lot.case_metal and cp.bullet.jacket == lot.jacket
+                assert cp.labels()["maker"] == lot.maker and cp.labels()["headstamp"], cart.key
+                assert all(k in ("text", "symbol") for k, _, _ in lot.marks)
+                assert "{" not in lot.headstamp_text, lot.headstamp_text
+                if kind != "loaded":
+                    assert lot.tip == "none" and cp.tip_length == 0.0
+                if lot.case_metal != "brass" or not cart.case.bottleneck:
+                    assert lot.anneal == 0.0, (cart.key, "only brass bottleneck cases show annealing")
+                if cart.case.rimfire:
+                    assert [at for _, _, at in lot.marks] == [0], "rimfire: one centre mark"
+        assert len(seen) > 1, f"{cart.key}: every copy from one maker"
+    a = variation.realize(CARTS[0], 99, "loaded")
+    b = variation.realize(CARTS[0], 99, "loaded")
+    assert a.lot == b.lot, "the maker draw is seeded"
+    c = variation.realize(CARTS[0], 99, "loaded", maker="kva")
+    assert c.lot.maker == "kva" and c.case.length == a.case.length, "naming a maker keeps the dimensions"
+    lc = next(c for c in CARTS if c.key == "223")
+    mil = variation.realize(lc, 5, "loaded", maker="lc-m855").lot
+    assert ("symbol", "nato", 3) in mil.marks and mil.primer_crimp == "ring" and mil.sealant != "none"
+
+
+def test_bad_makers_are_rejected():
+    good = specs.MAKERS_PATH.read_text(encoding="utf-8")
+    for old, new, msg in (
+        ('case = { brass = 1 }', 'case = { unobtainium = 1 }', "unknown metal"),
+        ('{ text = "CMX", at = 12 }', '{ text = "{maker}", at = 12 }', "placeholder"),
+        ('weights = { 223 = 3, 308 = 2 }', 'weights = { 233 = 3 }', "unknown cartridges"),
+        ('symbol = "nato"', 'symbol = "star"', "unknown symbol"),
+    ):
+        assert old in good, old
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "makers.toml"
+            p.write_text(good.replace(old, new, 1), encoding="utf-8")
+            try:
+                specs.load_makers(p, {c.key for c in CARTS})
+            except specs.SpecError as e:
+                assert msg in str(e), (msg, str(e))
+            else:
+                raise AssertionError(f"accepted a makers.toml with {new}")
 
 
 def test_bad_spec_is_rejected():

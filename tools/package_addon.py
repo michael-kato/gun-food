@@ -33,6 +33,7 @@ def files():
     for folder in ("specs", "bullets"):
         for src in sorted((ROOT / folder).glob("*.toml")):
             yield f"data/{folder}/{src.name}", src
+    yield "data/makers.toml", ROOT / "makers.toml"
     yield "LICENSE", ROOT / "LICENSE"
 
 

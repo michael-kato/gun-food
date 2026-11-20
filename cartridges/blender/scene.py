@@ -10,7 +10,7 @@ import numpy as np
 from mathutils import Vector
 
 from .. import profiles, variation
-from .materials import ground_material, metal_material, studio_world
+from .materials import ground_material, metal_material, paint_material, studio_world
 from .mesh import (
     BULLET_SEGMENTS,
     CASE_SEGMENTS,
@@ -20,8 +20,11 @@ from .mesh import (
     bullet_cavity,
     case_cavity,
     finish_shading,
+    flatten_head,
     headstamp_tools,
     lathe,
+    paint_tip,
+    primer_attrs,
 )
 
 GAP = 10.0  # mm between groups
@@ -122,11 +125,11 @@ def _collection(name, parent=None):
 
 
 def case_mesh(cart, cp: variation.Copy, name: str) -> tuple[bpy.types.Mesh, str]:
-    """Unique case mesh for one copy: sampled dimensions, crimp, dents, softened headstamp."""
+    """Unique case mesh for one copy: sampled dimensions, crimp, dents, the maker's headstamp."""
     prof = profiles.refine(profiles.case_profile(cp.case, cp.crimp), REFINE, outside_only=True)
     me = lathe(name, prof, CASE_SEGMENTS, offset=lambda r, z, t: variation.case_offset(cp, r, z, t))
     me.materials.append(metal_material(cp.case.material))
-    tools, region = headstamp_tools(cart, cp.case, random.Random(cp.headstamp_seed))
+    tools, region = headstamp_tools(cart, cp, random.Random(cp.headstamp_seed))
     solver = "none"
     if tools:
         tmp = bpy.data.objects.new("_case", me)
@@ -135,6 +138,7 @@ def case_mesh(cart, cp: variation.Copy, name: str) -> tuple[bpy.types.Mesh, str]
         me = tmp.data
         bpy.data.objects.remove(tmp)
         finish_shading(me)
+        flatten_head(me, region[3] if region else 0.3)
     case_cavity(me, cp.case, region)
     me.name = name
     return me, solver
@@ -145,22 +149,43 @@ def bullet_mesh(cp: variation.Copy, name: str) -> bpy.types.Mesh:
     me = lathe(name, prof, BULLET_SEGMENTS, offset=(lambda r, z, t: variation.bullet_offset(cp, r, z, t)) if cp.bullet_dents else None)
     me.materials.append(metal_material(cp.bullet.jacket))
     me.materials.append(metal_material(cp.bullet.core))
+    if cp.lot and cp.lot.tip != "none" and cp.tip_length > 0:
+        me.materials.append(paint_material(cp.lot.tip, cp.lot.tip_rgb))
+        paint_tip(me, cp.bullet, cp.tip_length, 2)
     bullet_cavity(me, cp.bullet)
     return me
 
 
-def primer_mesh(cart, cp: variation.Copy | None = None, name: str | None = None) -> bpy.types.Mesh | None:
-    """Shared unfired primer per cartridge, or a per-copy one with a firing-pin crater."""
+def primer_mesh(cart, cp: variation.Copy | None = None, name: str | None = None, metal: str | None = None) -> bpy.types.Mesh | None:
+    """An unfired primer (shareable), or with ``cp`` a fired one with its firing-pin crater."""
     if cart.case.rimfire:
         return None
     strike = cp.primer_strike if cp else None
-    me = lathe(name or f"{cart.key}.primer", profiles.primer_profile(cart.case, strike=strike), PRIMER_SEGMENTS)
-    me.materials.append(metal_material(cart.case.primer_cup))
+    metal = metal or (cp.case.primer_cup if cp else cart.case.primer_cup)
+    me = lathe(name or f"{cart.key}.primer.{metal}", profiles.primer_profile(cart.case, strike=strike), PRIMER_SEGMENTS)
+    me.materials.append(metal_material(metal))
+    primer_attrs(me, cart.case)
     return me
 
 
-def make_copy(coll, name, cart, cp: variation.Copy, primer, location, rot_z, stats):
-    """One item: a loaded round, a primed empty case, or a bullet."""
+def shared_primer(primers: dict | None, cart, metal: str):
+    """One unfired primer mesh per cartridge and metal, kept in ``primers``."""
+    if cart.case.rimfire:
+        return None
+    if primers is None:
+        return primer_mesh(cart, metal=metal)
+    key = (cart.key, metal)
+    if key not in primers:
+        primers[key] = primer_mesh(cart, metal=metal)
+    return primers[key]
+
+
+def make_copy(coll, name, cart, cp: variation.Copy, primers: dict | None, location, rot_z, stats):
+    """One item: a loaded round, a primed empty case, or a bullet.
+
+    ``primers`` caches the shared unfired primer meshes (see ``shared_primer``); fired
+    cases get their own struck primer.
+    """
     root = bpy.data.objects.new(name, None)
     root.empty_display_type = "PLAIN_AXES"
     root.empty_display_size = 0.002
@@ -176,6 +201,8 @@ def make_copy(coll, name, cart, cp: variation.Copy, primer, location, rot_z, sta
         ob.parent = root
         ob.location = (0.0, 0.0, z)
         ob.rotation_euler = rot
+        ob["gf_age"] = cp.age  # material drivers, see materials.py
+        ob["gf_wear"] = cp.wear
         coll.objects.link(ob)
         return ob
 
@@ -184,12 +211,17 @@ def make_copy(coll, name, cart, cp: variation.Copy, primer, location, rot_z, sta
         stats.setdefault("headstamp", {}).setdefault(cart.key, set()).add(solver)
         case_ob = child(me, "case")
         # material drivers in the object colour (see materials.py): dirt, soot in, soot out, anneal
-        anneal = random.Random(cp.seed ^ 0x5A5A).uniform(0.05, 0.3) if cp.case.bottleneck else 0.0
+        anneal = cp.lot.anneal if cp.lot else 0.0
         case_ob.color = (cp.dirt, cp.soot_in, cp.soot_out, anneal)
         if cp.kind == "fired" and not cart.case.rimfire:
             primer = primer_mesh(cart, cp, f"{name}.primer")
+        else:
+            primer = shared_primer(primers, cart, cp.case.primer_cup)
         if primer:
-            child(primer, "primer").color = (cp.dirt * (0.6 if cp.kind == "fired" else 1.0), 0.0, 0.0, 0.0)
+            pr = child(primer, "primer")
+            pr.color = (cp.dirt * (0.6 if cp.kind == "fired" else 1.0), 0.0, 0.0, 0.0)
+            pr["gf_seal"] = list(cp.lot.sealant_rgb) if cp.lot else [0.0, 0.0, 0.0]
+            pr["gf_smear"] = cp.lot.smear if cp.lot else 0.0
     if cp.kind == "loaded":
         tilt, az = math.radians(cp.runout[0]), cp.runout[1]
         bl = child(bullet_mesh(cp, f"{name}.bullet"), "bullet", (cp.case.length - cp.seat_depth) * MM, (tilt * math.cos(az), tilt * math.sin(az), 0.0))
@@ -251,7 +283,7 @@ def build_layout(carts, seed=1, columns=3, condition=None):
         x_left = -total_w / 2
         for ci, (cart, sizes, _block_w, _) in enumerate(row):
             coll = _collection(cart.key, root)
-            primer = primer_mesh(cart)
+            primers: dict = {}
             x = x_left
             for kind, (gw, _gd) in zip(GROUP_KINDS, sizes):
                 dia = _group_dia(cart, kind)
@@ -259,7 +291,7 @@ def build_layout(carts, seed=1, columns=3, condition=None):
                 for i, (dx, dy) in enumerate(_hex7(dia + CLEARANCE)):
                     cp = variation.realize(cart, variation.copy_seed(seed, cart.key, kind, i), kind, condition)
                     loc = Vector(((cx + dx) * MM, (y_c + dy) * MM, 0.0))
-                    make_copy(coll, f"{cart.key}.{kind}.{i}", cart, cp, primer, loc, rng.uniform(0, 2 * math.pi), stats)
+                    make_copy(coll, f"{cart.key}.{kind}.{i}", cart, cp, primers, loc, rng.uniform(0, 2 * math.pi), stats)
                 x += gw + GAP
             _label(labels, cart.name, (x_left + 1.0) * MM, (y_c - row_d[ri] / 2 - 2.0) * MM)
             x_left += col_w[ci] + GAP
@@ -421,7 +453,7 @@ def render_details(carts, out_dir, seed=1):
     for cart in carts:
         x += cart.max_dia / 2
         cp = variation.realize(cart, variation.copy_seed(seed, cart.key, "lineup"), "loaded")
-        make_copy(temp, f"_line.{cart.key}", cart, cp, primer_mesh(cart), (x * MM, 0, 0), 0.0, stats)
+        make_copy(temp, f"_line.{cart.key}", cart, cp, None, (x * MM, 0, 0), 0.0, stats)
         x += cart.max_dia / 2 + spacing
     width = x - spacing
     tallest = max(c.oal_max for c in carts)
@@ -440,7 +472,7 @@ def render_details(carts, out_dir, seed=1):
         d = max(cart.case.rim_dia, cart.case.base_dia)
         x += d / 2
         cp = variation.realize(cart, variation.copy_seed(seed, cart.key, "head"), "case")
-        root = make_copy(temp, f"_head.{cart.key}", cart, cp, primer_mesh(cart), (x * MM, 0, cp.case.length * MM), 0.0, stats)
+        root = make_copy(temp, f"_head.{cart.key}", cart, cp, None, (x * MM, 0, cp.case.length * MM), 0.0, stats)
         root.rotation_euler = (math.pi, 0.0, math.pi)  # head up, headstamp upright in the top view
         x += d / 2 + 3.0
     width = x - 3.0
@@ -471,7 +503,7 @@ def render_details(carts, out_dir, seed=1):
         cp = variation.realize(cart, variation.copy_seed(seed, cart.key, "fired-detail"), "fired")
         # lying on its side; the head sits back and to the left, the mouth forward and right
         cx, cy = x - cart.case.length / 2 * math.sin(turn), cart.case.length / 2 * math.cos(turn)
-        root = make_copy(temp, f"_fired.{cart.key}", cart, cp, primer_mesh(cart), (cx * MM, cy * MM, d / 2 * MM), 0.0, stats)
+        root = make_copy(temp, f"_fired.{cart.key}", cart, cp, None, (cx * MM, cy * MM, d / 2 * MM), 0.0, stats)
         root.rotation_euler = (math.pi / 2, 0.0, turn)  # axis runs (+sin, -cos): mouth forward and right
         x += foot / 2 + 5.0
     width = x - 5.0

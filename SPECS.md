@@ -79,12 +79,35 @@ Every copy in the scene is a separate, seeded sample of its spec (`cartridges/va
   SAAMI's limits. Bullet length varies 0.4% (one SD).
 - Factory-new handling damage: about 0.6 dents per 10 mm of case, 0.008–0.05 mm deep; up to 0.015 mm out-of-round at the mouth;
   a 25% chance of a dinged mouth on empty cases; bullet runout with a 0.12° SD tilt.
-- Fired cases (`fired` condition): body grows 0.03–0.1 mm and neck 0.05–0.15 mm on diameter toward the chamber, crimp gone, shoulder up to 0.08 mm forward; firing-pin crater 0.2–0.5 mm deep (rimfire: crushed rim); extractor nick; dents up to 0.2 mm deep from rocks and boots; soot inside and blow-by outside; dirt.
+- Fired cases (`fired` condition): body grows 0.03–0.1 mm and neck 0.05–0.15 mm on diameter toward the chamber, crimp gone, shoulder up to 0.08 mm forward; firing-pin crater 0.2–0.5 mm deep (rimfire: crushed rim); extractor nick; dents up to 0.2 mm deep from rocks and boots; mouths dented 0.08–0.55 mm (75% of cases); tarnished (age at least 0.65) and scratched (wear 0.45–1); soot inside and blow-by outside; dust.
 
 Sources for the spread: [new brass lot lengths](https://thefiringline.com/forums/showthread.php?p=2300477),
 [factory 9mm length variation](https://purple.thefiringline.com/goto/post?id=6804786),
 [match .223 length spread](https://www.ssusa.org/articles/2017/8/15/norma-usa-lowers-the-price-bar-for-competition-ammo),
 [bulk 55 gr FMJ weight spread](https://www.canadiangunnutz.com/forum/threads/norinco-cj-95-ammunition-powder-and-projectile-measured-weights.1070392/page-3).
+
+## Makers
+
+Each copy draws a maker ([`makers.toml`](makers.toml)), weighted per cartridge. The maker
+sets the headstamp, case and primer finish, primer sealant, primer crimp, annealing stain,
+age and, on loaded rounds, bullet jacket and tip paint. Commercial marks are made up; `LC`
+is the US Army's Lake City plant; the Eastern-bloc numbers are arsenal codes.
+
+| Maker | Headstamp | Case | Primer | Sealant | Primer crimp | Tip | Share per cartridge |
+|---|---|---|---|---|---|---|---|
+| **cmx**<br>CMX (placeholder commercial) | `CMX`@12 · `{caliber}`@6 | brass 82%, nickel 18% | nickel 67%, brass 33% | none 75%, blue 12%, green 12% | none | none | 9mm 33%, 223 20%, 45ACP 38%, 40CAL 38%, 380ACP 38%, 762x39 21%, 308 27%, 300blackout 50% |
+| **gunfood**<br>Gun Food house brand | `GUN FOOD`@12 · `{caliber}`@6 | brass | nickel | none | none | none | 9mm 22%, 223 13%, 45ACP 25%, 40CAL 25%, 380ACP 25%, 762x39 14%, 308 18%, 300blackout 33% |
+| **kva**<br>K V A (placeholder, spaced letters, pistol) | `K V A`@12 · `{caliber}`@6 | brass 67%, nickel 22%, aluminum 11% | nickel 75%, brass 25% | none | none | none | 9mm 22%, 45ACP 25%, 40CAL 25%, 380ACP 25% |
+| **lc**<br>Lake City, commercial | `LC`@12 · `{yy}`@9 · `{caliber}`@5 | brass | brass 67%, nickel 33% | none 75%, red 25% | none | none | 223 20%, 308 18% |
+| **lc-m855**<br>Lake City, military 5.56 NATO | `LC`@12 · `{yy}`@6 · ⟨nato⟩@3 + 0–3 dots | brass | brass | purple 75%, red 25% | ring | green 43%, lightgreen 14%, none 43% | 223 20% |
+| **lc-m80**<br>Lake City, military 7.62 NATO | `LC`@12 · `{yy}`@6 · ⟨nato⟩@3 + 0–2 dots | brass | brass | red 67%, purple 33% | ring | none 86%, red 14% | 308 27% |
+| **zm**<br>ZM, foreign military 5.56 | `ZM`@1 · `{yy}`@6 · `{military}`@10 | brass | brass | magenta 67%, red 33% | ring | green 33%, none 67% | 223 13% |
+| **sever**<br>SEVER (placeholder, steel case) | `SEVER`@12 · `{caliber}`@6 · ⟨ring⟩@3 | steel-polymer 75%, steel-lacquer 25% | brass | red 75%, none 25% | none | none | 9mm 22%, 223 13%, 45ACP 12%, 40CAL 12%, 380ACP 12%, 762x39 43%, 308 9%, 300blackout 17% |
+| **arsenal**<br>Eastern-bloc military (factory code and year) | `{code}`@12 · `{yy}`@6 | steel-lacquer 75%, brass 25% | brass | red 67%, purple 33% | stakes | none | 762x39 21% |
+| **rim-m**<br>M (placeholder rimfire) | `M`@0 | brass 75%, nickel 25% | spec | none | none | none | 22LR 67% |
+| **rim-g**<br>G (placeholder rimfire) | `G`@0 | brass | spec | none | none | none | 22LR 33% |
+
+Tip paint goes on loaded rounds only. Annealing stains show on brass bottleneck cases only.
 
 ## Sources and notes
 

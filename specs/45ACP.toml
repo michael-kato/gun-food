@@ -31,8 +31,7 @@ crimp_length = 2.8
 approx = ["oal", "crimp_amount"]
 
 [headstamp]
-top = "CMX"
-bottom = "45 AUTO"
+caliber = "45 AUTO"            # as commercial makers stamp it; makers.toml adds the rest
 
 [sources]
 case = "ANSI/SAAMI Z299.3-2022, 45 Automatic cartridge drawing (rev. 10/13/1992) — https://saami.org/wp-content/uploads/2025/05/SAAMI-Z299.3-2022-Centerfire-Pistol-Revolver-Approved-12-13-2022.pdf"

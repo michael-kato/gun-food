@@ -35,8 +35,8 @@ crimp_length = 0.6
 approx = ["crimp_amount"]
 
 [headstamp]
-top = "CMX"
-bottom = "308 WIN"
+caliber = "308 WIN"            # as commercial makers stamp it; makers.toml adds the rest
+military = "7.62"
 
 [sources]
 case = "ANSI/SAAMI Z299.4-2025, 308 Winchester cartridge drawing (rev. 06/03/2022) — https://saami.org/wp-content/uploads/2026/10/SAAMI-Z299.4-CFR-2025-Centerfire-Rifle-Approved-2-10-2025-2026-10-21.pdf"

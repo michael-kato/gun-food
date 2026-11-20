@@ -69,6 +69,45 @@ def _case_cell(c, name, tol_name):
     return s
 
 
+def _choices(table: dict) -> str:
+    total = sum(table.values()) or 1
+    return ", ".join(f"{k} {w / total:.0%}" if len(table) > 1 else k for k, w in table.items())
+
+
+def _makers_section(carts) -> list[str]:
+    makers = specs.default_makers()
+    out = [
+        "## Makers",
+        "",
+        "Each copy draws a maker ([`makers.toml`](makers.toml)), weighted per cartridge. The maker",
+        "sets the headstamp, case and primer finish, primer sealant, primer crimp, annealing stain,",
+        "age and, on loaded rounds, bullet jacket and tip paint. Commercial marks are made up; `LC`",
+        "is the US Army's Lake City plant; the Eastern-bloc numbers are arsenal codes.",
+        "",
+        "| Maker | Headstamp | Case | Primer | Sealant | Primer crimp | Tip | Share per cartridge |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for key, m in makers.makers.items():
+        marks = " · ".join(f"`{mk.text}`@{mk.at:g}" if mk.text else f"⟨{mk.symbol}⟩@{mk.at:g}" for mk in m.marks)
+        if m.dots[1]:
+            marks += f" + {m.dots[0]}–{m.dots[1]} dots"
+        share = []
+        for c in carts:
+            table = makers.for_cartridge(c)
+            if key in table:
+                share.append(f"{c.key} {table[key] / sum(table.values()):.0%}")
+        out.append(
+            f"| **{key}**<br>{m.name} | {marks} | {_choices(m.case)} | {_choices(m.primer) if m.primer else 'spec'} | "
+            f"{_choices(m.sealant)} | {m.primer_crimp} | {_choices(m.tip)} | {', '.join(share) or '—'} |"
+        )
+    out += [
+        "",
+        "Tip paint goes on loaded rounds only. Annealing stains show on brass bottleneck cases only.",
+        "",
+    ]
+    return out
+
+
 def generate() -> str:
     carts = specs.load_all()
     bullets = specs.load_bullets()
@@ -171,13 +210,16 @@ def generate() -> str:
         "toward the chamber, crimp gone, shoulder up to "
         f"{_num(fired.shoulder_forward[1])} mm forward; firing-pin crater {_num(fired.primer_strike_depth[0])}–{_num(fired.primer_strike_depth[1])} mm deep "
         "(rimfire: crushed rim); extractor nick; dents up to "
-        f"{_num(fired.dent_depth[1])} mm deep from rocks and boots; soot inside and blow-by outside; dirt.",
+        f"{_num(fired.dent_depth[1])} mm deep from rocks and boots; mouths dented "
+        f"{_num(fired.mouth_ding_depth[0])}–{_num(fired.mouth_ding_depth[1])} mm ({fired.mouth_ding_chance:.0%} of cases); "
+        f"tarnished (age at least {fired.age[0]:g}) and scratched (wear {fired.wear[0]:g}–{fired.wear[1]:g}); soot inside and blow-by outside; dust.",
         "",
         "Sources for the spread: [new brass lot lengths](https://thefiringline.com/forums/showthread.php?p=2300477),",
         "[factory 9mm length variation](https://purple.thefiringline.com/goto/post?id=6804786),",
         "[match .223 length spread](https://www.ssusa.org/articles/2017/8/15/norma-usa-lowers-the-price-bar-for-competition-ammo),",
         "[bulk 55 gr FMJ weight spread](https://www.canadiangunnutz.com/forum/threads/norinco-cj-95-ammunition-powder-and-projectile-measured-weights.1070392/page-3).",
         "",
+        *_makers_section(carts),
         "## Sources and notes",
         "",
     ]

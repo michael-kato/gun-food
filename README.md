@@ -8,8 +8,11 @@
 Parametric 3D models of firearm cartridges for Blender, built to **SAAMI dimensions and
 tolerances**, with procedural, physically based materials tuned for EEVEE. Every copy in a
 scene is a different, seeded sample: dimensions drawn inside the manufacturing tolerances,
-plus the small dents, out-of-round and runout that bulk-packed factory ammo picks up. Fired
-brass comes expanded, struck, sooty and dirty, the way it's found on the ground.
+plus the small dents, out-of-round and runout that bulk-packed factory ammo picks up. Each
+copy also comes from a "maker": commercial or military headstamps, brass, nickel, aluminium
+or coated steel cases, coloured primer sealant, green-tipped M855-style bullets. Fired
+brass comes expanded, struck, tarnished, scratched and sooty, the way it's picked up at the
+range.
 
 Built for synthetic training data (casing / caliber recognition) and for artists who want
 correct proportions.
@@ -43,7 +46,8 @@ matches the models.
 `cartridges.blend` holds every cartridge as three tightly packed groups of seven (loaded
 rounds, new primed cases, fired cases) with 10 mm between groups. Each copy carries its
 sampled values as custom properties (`case_length`, `oal`, `bullet_dia`, `condition`,
-`dirt`, `seed`, …), handy as training labels.
+`maker`, `headstamp`, `case_metal`, `sealant`, `tip`, `age`, `wear`, `dirt`, `seed`, …),
+handy as training labels.
 
 ## Blender add-on
 
@@ -58,7 +62,8 @@ A **Gun Food** tab appears in the 3D Viewport sidebar (N):
 | Cartridge, Kind | any of the specs above, as a loaded round, new primed case or fired case |
 | Count, Hex Cluster / Row | how many copies to place at the 3D cursor, and how |
 | Random Seed / Seed | a new seed every time, or a fixed one to rebuild the same copies |
-| Dirt, Soot | scale the condition's dirt and (fired) soot |
+| Maker | Any (one per copy, weighted for the cartridge) or a fixed maker from `makers.toml` |
+| Dirt, Soot, Age, Wear | scale the condition's dirt, (fired) soot, tarnish and scratches |
 | **Add Cartridges** | places the copies, each a separate in-tolerance sample |
 | **Re-roll Selected** | rebuilds the selected copies with new seeds, keeping their place, parent and collections |
 | **Duplicate as New Variation** | copies the selection beside itself, each copy a new sample |
@@ -116,17 +121,31 @@ specs/*.toml, bullets/*.toml ──▶ specs.py      load, fill defaults, valida
 - **Handling damage** (factory new, bulk packed): a few shallow dents, slight out-of-round
   toward the mouth, the odd dinged case mouth, bullet runout, softened edges, a light film
   of dust.
-- **Fired brass** (`fired` condition): body and neck expanded toward the chamber, crimp
-  gone, shoulder pushed slightly forward, a firing-pin crater in the primer (a crushed rim
-  on rimfire), an extractor nick, bigger dents and dinged mouths from rocks and boots,
-  charred interiors (heaviest at the bottom by the flash hole), blow-by soot on the neck,
-  and patchy soil caked into the recesses. Add more conditions in `variation.CONDITIONS`.
+- **Fired brass** (`fired` condition, modelled on range pickups): body and neck expanded
+  toward the chamber, crimp gone, shoulder pushed slightly forward, a firing-pin crater in
+  the primer (a crushed rim on rimfire), an extractor nick, mouths dented by the deflector
+  and boots, tarnish that streaks along the case, scratches, charred interiors (heaviest at
+  the bottom by the flash hole), blow-by soot on the neck and shoulder, and dust in the
+  recesses. Add more conditions in `variation.CONDITIONS`.
+- **Makers** (`makers.toml`): each copy draws one, weighted per cartridge. A maker sets the
+  headstamp layout, case finish (brass, nickel, aluminium, grey polymer or green lacquer
+  over steel), primer finish, primer sealant (purple, red, magenta, blue, green; a ring at
+  the cup's edge, sometimes run over the face), a staked primer crimp ring or three stab
+  marks, the annealing stain on rifle necks, the age range and, for loaded rounds, the
+  jacket (some pistol bullets are brass-jacketed, some .22s bare lead) and tip paint.
+  Military 5.56 and 7.62 NATO lots carry `LC`, a two-digit year, the NATO circled cross and
+  lot dots; Eastern-bloc 7.62×39 carries an arsenal code and year. See SPECS.md for the
+  full table.
 - **Headstamps** are real geometry, stamped in two layers (a shallow full letter and a deeper,
-  thinner core) for soft, rounded letter walls, with each letter's position, angle, size and
-  depth jittered like a hand-set bunter. Rimfire marks are raised.
-- **Materials** are all instances of one shared node group, **`GF Metal`**: each metal
-  (brass, gilding metal, copper, lead, nickel, steel, aluminium) is a material holding just
-  that group with its own inputs (reflectance, F82 edge tint, roughness, tarnish, oxide
+  thinner core) for soft letter walls, with each letter's position, angle, size and depth
+  jittered like a hand-set bunter. Marks sit at clock positions, read the way real ones do,
+  and are spaced at the letters' inner edge so neighbours never run together. Every glyph's
+  grown or thinned outline is checked before it's used: font outlines offset at tight
+  corners fold over themselves, and a folded cutter silently eats letters. Rimfire marks
+  are raised.
+- **Materials** are all instances of one shared node group, **`GF Metal`**: each finish
+  (brass, gilding metal, copper, lead, nickel, steel, polymer-coated and lacquered steel,
+  aluminium, tip paints) is a material holding just that group with its own inputs (reflectance, F82 edge tint, roughness, tarnish, oxide
   film, drawing marks, specks, micro-dents, annealing). Edit the group once and every metal
   follows; every copy of a part shares its metal's material.
 - **Layered, not blended.** Inside the group, metal, soil and soot are three complete BSDFs
@@ -134,9 +153,15 @@ specs/*.toml, bullets/*.toml ──▶ specs.py      load, fill defaults, valida
   mask edges never turn into half-metallic brass with a pale outline. The soil has its own
   grain bump; soot is matte carbon.
 - **Per-copy drivers** are baked into vertex attributes (`cavity` for recesses instead of
-  costly ambient occlusion, `interior`, `zn` height along the case, `anneal` band) or
-  packed into the object colour (R dirt, G soot inside, B soot outside, A annealing), which
-  EEVEE reads as a plain uniform. Set an object's colour to make it cleaner or filthier.
+  costly ambient occlusion, `interior`, `zn` height along the case, `anneal` band, `rn`
+  primer radius) or set on the object: the object colour (R dirt, G soot inside, B soot
+  outside, A annealing) and the properties `gf_age` (tarnish), `gf_wear` (scratches) and,
+  on primers, `gf_seal` (sealant colour) and `gf_smear`. EEVEE reads these as uniforms
+  (at most 8 per material, so they're kept few). Change them on an object to make it
+  cleaner, older or filthier.
+- **Age and wear.** Tarnish spreads from blotches into streaks along the case and darkens
+  with age; scratches run along the case and show bright through tarnish and dirt; the
+  annealing stain fades from blue-grey on the neck through brown into the body.
 - **EEVEE setup:** screen-space ray tracing with a 2 mm trace thickness (the 0.2 m default
   smears copper beside millimetre-sized parts), shadows, no fast GI. Detail shots use a long
   lens instead of an orthographic camera, which also breaks screen-space reflections.
@@ -154,6 +179,7 @@ specs/*.toml, bullets/*.toml ──▶ specs.py      load, fill defaults, valida
    ```sh
    python tests/test_specs_and_profiles.py
    python tools/gen_specs_md.py
+   blender --background --factory-startup --python tests/test_headstamps.py   # every maker's headstamp stamps cleanly, ~20 s
    blender --background --factory-startup --python tests/test_addon.py   # add-on smoke test, ~50 s
    ```
 
@@ -175,14 +201,17 @@ outside SAAMI's limits, a neck wider than the shoulder) with a message saying wh
 
 ## Headstamps
 
-Maker marks are the placeholder `CMX` (and `M` on rimfire). The caliber text follows real
-practice (`223 REM`, `45 AUTO`, …). Change `[headstamp]` in a spec to use your own.
+Commercial maker marks are made up (`CMX`, `GUN FOOD`, `K V A`, `SEVER`, `ZM`, rimfire `M`
+and `G`); `LC` is the US Army's Lake City plant, and the 7.62×39 arsenal codes are factory
+numbers, not brands. The caliber text follows real practice (`223 REM`, `45 AUTO`, …) and
+lives in each spec's `[headstamp]`. Add your own makers, or change the weights, in
+`makers.toml`; the loader checks every field and names what's wrong.
 
 ## Roadmap
 
 - Fired cases: ejector marks, chamber scuffs, off-centre strikes, split necks, crushed cases;
   scattered (lying) layouts for field scenes
-- Case variations: steel (lacquered and polymer coated), aluminium, nickel plated
+- Berdan primers and bimetal (copper-washed steel) jackets for steel-cased ammo
 - More bullet types: hollow point, soft point, polymer tip, lead round nose, wadcutter
 - More cartridges
 

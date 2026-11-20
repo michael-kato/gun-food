@@ -57,7 +57,9 @@ check(len({r["seed"] for r in roots()}) == 7, "every copy has its own seed")
 coll = bpy.data.collections.get("Gun Food 9mm")
 check(coll is not None and len(coll.objects) == 7 * 4, "copies land in 'Gun Food 9mm' (root, case, primer, bullet each)")
 primers = {o.data.name for o in bpy.data.objects if o.name.endswith(".primer")}
-check(len(primers) == 1, f"one shared primer mesh per add (got {len(primers)})")
+metals = {r["primer_metal"] for r in roots()}
+check(len(primers) == len(metals), f"one shared primer mesh per primer metal ({len(primers)} meshes, metals {sorted(metals)})")
+check(all(r["maker"] and r["headstamp"] for r in roots()), "copies carry their maker and headstamp")
 
 # fired and empty cases, a row
 s.cartridge, s.kind, s.count, s.arrangement = "308", "fired", 5, "ROW"

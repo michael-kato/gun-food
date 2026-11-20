@@ -34,8 +34,7 @@ crimp_length = 0.6
 approx = ["crimp_amount"]
 
 [headstamp]
-top = "CMX"
-bottom = "7.62x39"
+caliber = "7.62x39"            # as commercial makers stamp it; makers.toml adds the rest
 
 [sources]
 case = "ANSI/SAAMI Z299.4-2025, 7.62x39 cartridge drawing (rev. 02/28/2022) — https://saami.org/wp-content/uploads/2026/10/SAAMI-Z299.4-CFR-2025-Centerfire-Rifle-Approved-2-10-2025-2026-10-21.pdf"

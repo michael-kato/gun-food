@@ -1,0 +1,177 @@
+# Makers: headstamp layouts and finishes, drawn per copy.
+#
+# Every copy draws one maker, weighted per cartridge. The maker sets the headstamp, the case
+# and primer finish, the primer sealant, the annealing stain, the age (tarnish) and, for
+# loaded rounds, the bullet jacket and tip paint. Commercial marks here are made up. "LC" is
+# the US Army's Lake City plant; the Eastern-bloc numbers are arsenal codes, not brands.
+#
+# Where a maker applies: `weight` for every cartridge of `classes` (pistol, rifle, rimfire),
+# and/or `weights = { cartridge = weight }` per cartridge (these win).
+#
+# Choices are tables of { option = weight }; ranges are [min, max].
+#
+# marks: text or a symbol centred at a clock position (12 top, 3 right, 6 bottom, 9 left;
+#   0 = centre, rimfire only, raised). Text in the top half reads clockwise with the letter
+#   bottoms toward the primer; in the bottom half it reads counter-clockwise, upright.
+#   Placeholders: {caliber} and {military} (the spec's [headstamp]), {yy} (two-digit year
+#   from `years`), {code} (one of `codes`). Symbols: nato (circled cross), ring, dot.
+# dots: how many extra dots (lot / month marks) go in free spots.
+# primer_crimp: none, ring (a staked ring around the pocket) or stakes (three stab marks).
+# style: letters' stroke `weight` (fraction of letter height added to each side), `width`
+#   (horizontal scale), `size` (scale on the default letter height), `depth` (scale).
+
+[sealants]  # primer sealant lacquer, linear RGB
+purple = [0.08, 0.012, 0.11]
+red = [0.22, 0.008, 0.006]
+magenta = [0.34, 0.015, 0.12]
+blue = [0.008, 0.04, 0.25]
+green = [0.01, 0.12, 0.075]
+
+[paints]  # bullet tip paint, linear RGB
+green = [0.012, 0.07, 0.02]
+lightgreen = [0.05, 0.17, 0.05]
+red = [0.30, 0.02, 0.006]
+
+[[maker]]
+key = "cmx"
+name = "CMX (placeholder commercial)"
+classes = ["pistol", "rifle"]
+weight = 3
+marks = [{ text = "CMX", at = 12 }, { text = "{caliber}", at = 6 }]
+case = { brass = 9, nickel = 2 }
+primer = { nickel = 2, brass = 1 }
+sealant = { none = 6, blue = 1, green = 1 }
+smear = [0.0, 0.5]
+age = [0.0, 0.35]
+style = { weight = 0.03 }
+
+[[maker]]
+key = "gunfood"
+name = "Gun Food house brand"
+classes = ["pistol", "rifle"]
+weight = 2
+marks = [{ text = "GUN FOOD", at = 12 }, { text = "{caliber}", at = 6 }]
+case = { brass = 1 }
+primer = { nickel = 1 }
+age = [0.0, 0.3]
+style = { weight = 0.05, size = 0.95 }
+
+[[maker]]
+key = "kva"
+name = "K V A (placeholder, spaced letters, pistol)"
+classes = ["pistol"]
+weight = 2
+marks = [{ text = "K V A", at = 12 }, { text = "{caliber}", at = 6 }]
+case = { brass = 6, nickel = 2, aluminum = 1 }
+primer = { nickel = 3, brass = 1 }
+jacket = { gilding-metal = 2, brass = 1 }
+age = [0.0, 0.5]
+style = { width = 0.85, weight = 0.02 }
+
+[[maker]]
+key = "lc"
+name = "Lake City, commercial"
+weights = { 223 = 3, 308 = 2 }
+marks = [{ text = "LC", at = 12 }, { text = "{yy}", at = 9 }, { text = "{caliber}", at = 5 }]
+years = [2005, 2026]
+case = { brass = 1 }
+primer = { brass = 2, nickel = 1 }
+sealant = { none = 3, red = 1 }
+anneal = [0.3, 0.8]
+age = [0.1, 0.6]
+
+[[maker]]
+key = "lc-m855"
+name = "Lake City, military 5.56 NATO"
+weights = { 223 = 3 }
+marks = [{ text = "LC", at = 12 }, { text = "{yy}", at = 6 }, { symbol = "nato", at = 3 }]
+dots = [0, 3]
+years = [1985, 2026]
+case = { brass = 1 }
+primer = { brass = 1 }
+sealant = { purple = 3, red = 1 }
+smear = [0.0, 0.15]
+primer_crimp = "ring"
+anneal = [0.6, 1.0]
+age = [0.15, 0.75]
+tip = { green = 3, lightgreen = 1, none = 3 }
+
+[[maker]]
+key = "lc-m80"
+name = "Lake City, military 7.62 NATO"
+weights = { 308 = 3 }
+marks = [{ text = "LC", at = 12 }, { text = "{yy}", at = 6 }, { symbol = "nato", at = 3 }]
+dots = [0, 2]
+years = [1975, 2026]
+case = { brass = 1 }
+primer = { brass = 1 }
+sealant = { red = 2, purple = 1 }
+smear = [0.0, 0.15]
+primer_crimp = "ring"
+anneal = [0.6, 1.0]
+age = [0.2, 0.8]
+tip = { none = 6, red = 1 }
+
+[[maker]]
+key = "zm"
+name = "ZM, foreign military 5.56"
+weights = { 223 = 2 }
+marks = [{ text = "ZM", at = 1 }, { text = "{yy}", at = 6 }, { text = "{military}", at = 10 }]
+years = [1995, 2026]
+case = { brass = 1 }
+primer = { brass = 1 }
+sealant = { magenta = 2, red = 1 }
+smear = [0.0, 0.3]
+primer_crimp = "ring"
+anneal = [0.4, 0.9]
+age = [0.1, 0.6]
+tip = { green = 1, none = 2 }
+style = { weight = 0.04, width = 1.1 }
+
+[[maker]]
+key = "sever"
+name = "SEVER (placeholder, steel case)"
+weights = { 9mm = 2, 223 = 2, 762x39 = 6, 308 = 1, 380ACP = 1, 45ACP = 1, 40CAL = 1, 300blackout = 1 }
+marks = [{ text = "SEVER", at = 12 }, { text = "{caliber}", at = 6 }, { symbol = "ring", at = 3 }]
+case = { steel-polymer = 3, steel-lacquer = 1 }
+primer = { brass = 1 }
+sealant = { red = 3, none = 1 }
+age = [0.0, 0.4]
+style = { weight = 0.02, width = 0.9 }
+
+[[maker]]
+key = "arsenal"
+name = "Eastern-bloc military (factory code and year)"
+weights = { 762x39 = 3 }
+marks = [{ text = "{code}", at = 12 }, { text = "{yy}", at = 6 }]
+codes = ["3", "17", "38", "60", "188", "270", "539", "711"]
+years = [1960, 1991]
+case = { steel-lacquer = 3, brass = 1 }
+primer = { brass = 1 }
+sealant = { red = 2, purple = 1 }
+smear = [0.0, 0.3]
+primer_crimp = "stakes"
+age = [0.3, 0.9]
+style = { weight = 0.04, size = 1.1 }
+
+# Rimfire: a single raised letter in the middle of the head.
+
+[[maker]]
+key = "rim-m"
+name = "M (placeholder rimfire)"
+classes = ["rimfire"]
+weight = 2
+marks = [{ text = "M", at = 0 }]
+case = { brass = 3, nickel = 1 }
+jacket = { copper = 3, lead = 1 }
+age = [0.0, 0.4]
+
+[[maker]]
+key = "rim-g"
+name = "G (placeholder rimfire)"
+classes = ["rimfire"]
+weight = 1
+marks = [{ text = "G", at = 0 }]
+case = { brass = 1 }
+jacket = { copper = 1, lead = 1 }
+age = [0.0, 0.5]

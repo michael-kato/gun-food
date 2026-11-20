@@ -37,8 +37,8 @@ crimp_length = 0.6
 approx = ["crimp_amount"]
 
 [headstamp]
-top = "CMX"
-bottom = "223 REM"
+caliber = "223 REM"            # as commercial makers stamp it; makers.toml adds the rest
+military = "5.56"
 
 [sources]
 case = "ANSI/SAAMI Z299.4-2025, 223 Remington cartridge drawing (rev. 09/25/2023) — https://saami.org/wp-content/uploads/2026/10/SAAMI-Z299.4-CFR-2025-Centerfire-Rifle-Approved-2-10-2025-2026-10-21.pdf"

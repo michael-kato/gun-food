@@ -29,7 +29,7 @@ crimp_length = 0.5
 approx = ["crimp_amount"]
 
 [headstamp]
-center = "M"            # placeholder maker mark (raised)
+# rimfire heads carry only the maker's raised letter (see makers.toml)
 
 [sources]
 case = "ANSI/SAAMI Z299.1-2026, 22 Long Rifle - Sporting cartridge drawing (rev. 01/19/2025) — https://saami.org/wp-content/uploads/2026/05/SAAMI-Z299.1-R2026-Rimfire-FINAL-Approved-2026-05-08.pdf"

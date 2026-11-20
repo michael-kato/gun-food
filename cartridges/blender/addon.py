@@ -60,6 +60,17 @@ def _cart_items(self, context):
     return _items
 
 
+_maker_list: list = []
+
+
+def _maker_items(self, context):
+    global _maker_list
+    makers = specs.default_makers().makers
+    _maker_list = [("ANY", "Any", "One maker per copy, weighted for the cartridge")]
+    _maker_list += [(k, m.name, f"{m.name}: " + " ".join(mk.text or f"<{mk.symbol}>" for mk in m.marks)) for k, m in makers.items()]
+    return _maker_list
+
+
 def _fill_overrides(self, context=None):
     c = carts().get(self.cartridge)
     if c:
@@ -84,8 +95,11 @@ class GunFoodSettings(bpy.types.PropertyGroup):
     )
     random_seed: BoolProperty(name="Random Seed", default=True, description="A new seed every time; off to use the seed below")
     seed: IntProperty(name="Seed", default=1, min=0)
+    maker: EnumProperty(name="Maker", items=_maker_items, description="Whose headstamp and finish; Any draws one per copy, weighted for the cartridge")
     dirt_scale: FloatProperty(name="Dirt", default=1.0, min=0.0, max=3.0, description="Multiplies the condition's dirt")
     soot_scale: FloatProperty(name="Soot", default=1.0, min=0.0, max=3.0, description="Multiplies a fired case's soot")
+    age_scale: FloatProperty(name="Age", default=1.0, min=0.0, max=3.0, description="Multiplies the tarnish")
+    wear_scale: FloatProperty(name="Wear", default=1.0, min=0.0, max=3.0, description="Multiplies the scratches")
     use_overrides: BoolProperty(name="Override Spec", default=False, update=_on_toggle_overrides, description="Use the dimensions below instead of the spec's maximums")
     ov_key: StringProperty(options={"HIDDEN"})  # cartridge the override fields were filled from
     ov_length: FloatProperty(name="Case Length (mm)", default=1.0, min=1.0, precision=3)
@@ -169,17 +183,14 @@ class _Maker:
 
     def __call__(self, cart, kind, seed, location=(0.0, 0.0, 0.0), rot_z=0.0, colls=None):
         s = self.s
-        cp = variation.realize(cart, seed, kind)
+        cp = variation.realize(cart, seed, kind, maker=None if s.maker == "ANY" else s.maker)
         cp.dirt = min(1.0, cp.dirt * s.dirt_scale)
         cp.soot_in = min(1.0, cp.soot_in * s.soot_scale)
         cp.soot_out = min(1.0, cp.soot_out * s.soot_scale)
-        primer = None  # fired cases get their own struck primer
-        if kind != "fired":
-            if cart.key not in self.primers:
-                self.primers[cart.key] = sc.primer_mesh(cart)
-            primer = self.primers[cart.key]
+        cp.age = min(1.0, cp.age * s.age_scale)
+        cp.wear = min(1.0, cp.wear * s.wear_scale)
         colls = colls or [_collection(self.context, cart.key)]
-        root = sc.make_copy(colls[0], f"{cart.key}.{kind}.{seed}", cart, cp, primer, location, rot_z, {})
+        root = sc.make_copy(colls[0], f"{cart.key}.{kind}.{seed}", cart, cp, self.primers, location, rot_z, {})
         for c in colls[1:]:
             for ob in (root, *root.children):
                 c.objects.link(ob)
@@ -356,9 +367,18 @@ class GUNFOOD_PT_main(bpy.types.Panel):
         sub = row.row(align=True)
         sub.enabled = not s.random_seed
         sub.prop(s, "seed")
+        col.prop(s, "maker")
+        if s.maker != "ANY":
+            m = specs.default_makers().makers.get(s.maker)
+            cart = carts().get(s.cartridge)
+            if m and cart and m.weight_for(cart) == 0:
+                col.label(text="This maker doesn't normally load this cartridge", icon="INFO")
         row = col.row(align=True)
         row.prop(s, "dirt_scale", slider=True)
         row.prop(s, "soot_scale", slider=True)
+        row = col.row(align=True)
+        row.prop(s, "age_scale", slider=True)
+        row.prop(s, "wear_scale", slider=True)
         col.operator(GUNFOOD_OT_add.bl_idname, icon="ADD")
         col.separator()
         box = col.box()

@@ -11,10 +11,13 @@ Every copy is a *realization* of its spec, drawn from a seed:
   min/max. Roll-crimped rifle rounds seat on the bullet's cannelure instead.
 * **Condition** (``CONDITIONS``): ``new`` is factory-new ammo that was tumbled, boxed and
   shipped in bulk: a few shallow dents, slight out-of-round, the odd dinged case mouth,
-  small bullet runout, a light film of dust. ``fired`` is brass picked up off the ground:
+  small bullet runout, a light film of dust. ``fired`` is brass picked up at the range:
   body and neck expanded to the chamber, crimp gone, firing-pin crater in the primer (a
-  rim crush on rimfire), an extractor nick, bigger dents from rocks and boots, soot
-  inside and blow-by outside, and dirt.
+  rim crush on rimfire), an extractor nick, dented mouths, bigger dents from rocks and
+  boots, tarnish and scratches, soot inside and blow-by outside, and dust.
+* **Maker** (``makers.toml``, see ``sample_lot``): headstamp, case and primer finish,
+  sealant, primer crimp, annealing stain, age, bullet jacket and tip paint. Drawn from
+  its own random stream, so makers can be added without reshuffling the dimensions.
 
 Pure Python, deterministic for a given seed.
 """
@@ -26,6 +29,7 @@ import math
 import random
 from dataclasses import dataclass, field, replace
 
+from . import specs
 from .profiles import Crimp
 from .specs import BulletSpec, Cartridge, CaseSpec
 
@@ -65,6 +69,9 @@ class Condition:
     primer_strike_depth: tuple[float, float] = (0.0, 0.0)  # mm
     rim_strike_depth: tuple[float, float] = (0.0, 0.0)  # mm, rimfire firing pin crush
     extractor_nick_chance: float = 0.0
+    mouth_ding_radius: tuple[float, float] = (0.6, 1.6)  # mm
+    age: tuple[float, float] = (0.0, 0.0)  # material: tarnish at least this (the maker sets the rest)
+    wear: tuple[float, float] = (0.0, 0.35)  # material: scuffs and scratches along the case
 
 
 CONDITIONS = {
@@ -86,13 +93,16 @@ CONDITIONS = {
         dents_per_10mm=1.4,
         dent_radius=(0.8, 3.0),
         dent_depth=(0.02, 0.20),
-        mouth_ding_chance=0.6,
-        mouth_ding_depth=(0.05, 0.25),
+        mouth_ding_chance=0.75,  # ejected into the brass deflector, then trodden on
+        mouth_ding_depth=(0.08, 0.55),
+        mouth_ding_radius=(1.0, 2.6),
         ovality=(0.0, 0.08),
         runout_sd=0.0,
         tip_ding_chance=0.0,
         edge_softening=(1.0, 1.15),
-        dirt=(0.45, 1.0),
+        dirt=(0.15, 0.6),  # range pickups: dust and the odd smear of soil, not caked mud
+        age=(0.65, 1.0),
+        wear=(0.45, 1.0),
         soot_in=(0.6, 1.0),
         soot_out=(0.4, 1.0),
         fired=True,
@@ -106,6 +116,86 @@ CONDITIONS = {
         extractor_nick_chance=0.7,
     ),
 }
+
+
+@dataclass(frozen=True)
+class Lot:
+    """What a copy's maker decided: headstamp, finishes, sealant, tip paint."""
+
+    maker: str
+    marks: tuple[tuple[str, str, float], ...]  # ("text" | "symbol", value, clock position)
+    dots: tuple[float, ...]  # clock positions of extra dots
+    year: int
+    case_metal: str
+    primer_metal: str
+    sealant: str  # "none" or a [sealants] name
+    sealant_rgb: tuple[float, float, float]
+    smear: float  # 0-1, how far the sealant runs over the primer face
+    primer_crimp: str
+    anneal: float  # 0-1, neck and shoulder annealing stain
+    age: float  # 0-1, tarnish
+    jacket: str
+    tip: str  # "none" or a [paints] name
+    tip_rgb: tuple[float, float, float]
+    style: specs.Style
+
+    @property
+    def headstamp_text(self) -> str:
+        return " ".join(v if k == "text" else f"<{v}>" for k, v, _ in sorted(self.marks, key=lambda m: m[2] % 12))
+
+
+def _choose(rng, table: dict[str, float]) -> str:
+    items = [(k, w) for k, w in table.items() if w > 0]
+    x = rng.random() * sum(w for _, w in items)
+    for k, w in items:
+        x -= w
+        if x <= 0:
+            return k
+    return items[-1][0]
+
+
+def sample_lot(cart: Cartridge, rng: random.Random, kind: str, makers: specs.Makers, maker: str | None = None) -> Lot:
+    """Pick a maker for ``cart`` (weighted, or the one named) and draw its choices."""
+    table = makers.for_cartridge(cart)
+    if maker is None:
+        if not table:
+            raise specs.SpecError(f"{cart.key}: no maker in makers.toml loads this cartridge")
+        maker = _choose(rng, table)
+    m = makers.makers[maker]
+    year = rng.randint(*m.years)
+    hs = cart.headstamp
+    subs = dict(caliber=hs.caliber, military=hs.military or hs.caliber, yy=f"{year % 100:02d}", code=rng.choice(m.codes) if m.codes else "")
+    marks = []
+    for mk in m.marks:
+        if mk.symbol:
+            marks.append(("symbol", mk.symbol, mk.at))
+        elif text := mk.text.format(**subs).strip():
+            marks.append(("text", text, mk.at))
+    taken = [at for _, _, at in marks]
+    free = [h for h in range(1, 13) if all(min(abs(h - t), 12 - abs(h - t)) >= 1.5 for t in taken)]
+    rng.shuffle(free)
+    dots = tuple(free[: rng.randint(*m.dots)])
+    case_metal = _choose(rng, m.case)
+    sealant = _choose(rng, m.sealant)
+    tip = _choose(rng, m.tip) if kind == "loaded" else "none"
+    return Lot(
+        maker=maker,
+        marks=tuple(marks),
+        dots=dots,
+        year=year,
+        case_metal=case_metal,
+        primer_metal=_choose(rng, m.primer) if m.primer else cart.case.primer_cup,
+        sealant=sealant,
+        sealant_rgb=makers.sealants.get(sealant, (0.0, 0.0, 0.0)),
+        smear=rng.uniform(*m.smear) if sealant != "none" else 0.0,
+        primer_crimp=m.primer_crimp,
+        anneal=rng.uniform(*m.anneal) if cart.case.bottleneck and case_metal == "brass" else 0.0,
+        age=rng.uniform(*m.age),
+        jacket=_choose(rng, m.jacket) if m.jacket else cart.bullet.jacket,
+        tip=tip,
+        tip_rgb=makers.paints.get(tip, (0.0, 0.0, 0.0)),
+        style=m.style,
+    )
 
 
 @dataclass(frozen=True)
@@ -138,6 +228,10 @@ class Copy:
     soot_in: float = 0.0
     soot_out: float = 0.0
     headstamp_seed: int = 0
+    lot: Lot | None = None
+    age: float = 0.0  # tarnish, 0-1
+    wear: float = 0.0  # scratches, 0-1
+    tip_length: float = 0.0  # mm of painted tip
 
     def labels(self) -> dict:
         """Flat values worth storing on the object (training labels, debugging)."""
@@ -145,6 +239,11 @@ class Copy:
             "seed": self.seed,
             "kind": self.kind,
             "condition": self.condition,
+            "maker": self.lot.maker if self.lot else "",
+            "headstamp": self.lot.headstamp_text if self.lot else "",
+            "case_metal": self.case.material,
+            "age": round(self.age, 3),
+            "wear": round(self.wear, 3),
             "case_length": round(self.case.length, 4),
             "case_rim_dia": round(self.case.rim_dia, 4),
             "case_base_dia": round(self.case.base_dia, 4),
@@ -152,8 +251,12 @@ class Copy:
             "dent_count": len(self.case_dents),
             "dirt": round(self.dirt, 3),
         }
+        if not self.case.rimfire and self.lot:
+            out.update(primer_metal=self.lot.primer_metal, sealant=self.lot.sealant)
         if self.kind in ("loaded", "bullet"):
-            out.update(bullet_dia=round(self.bullet.dia, 4), bullet_length=round(self.bullet.length, 4))
+            out.update(bullet_dia=round(self.bullet.dia, 4), bullet_length=round(self.bullet.length, 4), jacket=self.bullet.jacket)
+            if self.lot and self.lot.tip != "none":
+                out.update(tip=self.lot.tip)
         if self.kind == "loaded":
             out.update(oal=round(self.oal, 4), seat_depth=round(self.seat_depth, 4), runout_deg=round(self.runout[0], 4))
         if self.kind == "fired":
@@ -251,16 +354,28 @@ def _dents(rng, count, z_range, radius, depth):
     return out
 
 
-def realize(cart: Cartridge, seed: int, kind: str = "loaded", condition: str | None = None) -> Copy:
+def realize(
+    cart: Cartridge,
+    seed: int,
+    kind: str = "loaded",
+    condition: str | None = None,
+    maker: str | None = None,
+    makers: specs.Makers | None = None,
+) -> Copy:
     """Sample one copy of ``cart``. ``kind``: loaded, case, fired or bullet.
 
-    ``condition`` defaults to ``fired`` for fired cases and ``new`` otherwise.
+    ``condition`` defaults to ``fired`` for fired cases and ``new`` otherwise. ``maker``
+    picks a maker from ``makers`` (default: ``makers.toml``); otherwise one is drawn,
+    weighted for this cartridge.
     """
     condition = condition or ("fired" if kind == "fired" else "new")
     cond = CONDITIONS[condition]
     rng = random.Random(seed)
-    case = sample_case(cart, rng, cond)
-    bullet = sample_bullet(cart.bullet, rng)
+    # the maker gets its own stream, so adding makers never reshuffles the dimensions
+    lot_rng = random.Random(copy_seed(seed, "lot"))
+    lot = sample_lot(cart, lot_rng, kind, makers or specs.default_makers(), maker)
+    case = replace(sample_case(cart, rng, cond), material=lot.case_metal, primer_cup=lot.primer_metal)
+    bullet = replace(sample_bullet(cart.bullet, rng), jacket=lot.jacket)
 
     if bullet.heel_dia:
         seat = bullet.heel_length
@@ -282,7 +397,7 @@ def realize(cart: Cartridge, seed: int, kind: str = "loaded", condition: str | N
     n = _poisson(rng, cond.dents_per_10mm * case.length / 10)
     case_dents = _dents(rng, n, (body_lo, case.length - 0.4), cond.dent_radius, cond.dent_depth)
     if kind in ("case", "fired") and rng.random() < cond.mouth_ding_chance:
-        case_dents.append(Dent(case.length - rng.uniform(0.0, 0.5), rng.uniform(0, 2 * math.pi), rng.uniform(0.6, 1.6), rng.uniform(*cond.mouth_ding_depth)))
+        case_dents.append(Dent(case.length - rng.uniform(0.0, 0.5), rng.uniform(0, 2 * math.pi), rng.uniform(*cond.mouth_ding_radius), rng.uniform(*cond.mouth_ding_depth)))
 
     rim_dents, strike = [], None
     if cond.fired:
@@ -319,6 +434,10 @@ def realize(cart: Cartridge, seed: int, kind: str = "loaded", condition: str | N
         soot_in=rng.uniform(*cond.soot_in),
         soot_out=rng.uniform(*cond.soot_out) if case.bottleneck or rng.random() < 0.5 else 0.0,
         headstamp_seed=rng.randrange(1 << 30),
+        lot=lot,
+        age=max(lot.age, lot_rng.uniform(*cond.age)),
+        wear=lot_rng.uniform(*cond.wear),
+        tip_length=lot_rng.uniform(0.28, 0.38) * bullet.nose_length if lot.tip != "none" else 0.0,
     )
 
 

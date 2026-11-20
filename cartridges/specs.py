@@ -25,9 +25,13 @@ import tomllib
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-SPEC_DIR = ROOT / "specs"
-BULLET_DIR = ROOT / "bullets"
+_PKG = Path(__file__).resolve().parent
+ROOT = _PKG.parent
+# The packaged Blender extension carries its own copy of the specs in data/;
+# in the repository they live at the top level.
+_BUNDLED = _PKG / "data"
+SPEC_DIR = _BUNDLED / "specs" if (_BUNDLED / "specs").is_dir() else ROOT / "specs"
+BULLET_DIR = _BUNDLED / "bullets" if (_BUNDLED / "bullets").is_dir() else ROOT / "bullets"
 
 CLASSES = ("pistol", "rifle", "rimfire")
 

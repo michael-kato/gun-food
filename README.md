@@ -45,6 +45,30 @@ rounds, new primed cases, fired cases) with 10 mm between groups. Each copy carr
 sampled values as custom properties (`case_length`, `oal`, `bullet_dia`, `condition`,
 `dirt`, `seed`, …), handy as training labels.
 
+## Blender add-on
+
+The easiest way in. Get `gun_food-<version>.zip` from the repo's Releases (or build it:
+`python tools/package_addon.py`, which writes it to `dist/`), then drag it into Blender, or
+use Edit > Preferences > Get Extensions > ⌄ > Install from Disk. Needs Blender 4.2+.
+
+A **Gun Food** tab appears in the 3D Viewport sidebar (N):
+
+| Control | Does |
+|---|---|
+| Cartridge, Kind | any of the specs above, as a loaded round, new primed case or fired case |
+| Count, Hex Cluster / Row | how many copies to place at the 3D cursor, and how |
+| Random Seed / Seed | a new seed every time, or a fixed one to rebuild the same copies |
+| Dirt, Soot | scale the condition's dirt and (fired) soot |
+| **Add Cartridges** | places the copies, each a separate in-tolerance sample |
+| **Re-roll Selected** | rebuilds the selected copies with new seeds, keeping their place, parent and collections |
+| **Duplicate as New Variation** | copies the selection beside itself, each copy a new sample |
+| **Add Catalog** | the full grouped layout of every cartridge, as `build.py` makes it |
+| **Tune EEVEE for Small Parts** | the EEVEE settings below, on the current scene |
+| Spec Overrides | change case length, base, mouth and rim diameters, rim thickness, loaded length and crimp; copies still vary inside the tolerances around the new values, and settings that can't be built are refused with the reason |
+
+The add-on runs the same code as `build.py` and reads the same TOML specs (bundled in the
+ZIP), so a cartridge added from the panel matches one from the command line.
+
 ## Build
 
 Needs Blender 4.2 or newer (developed on 5.2). No other dependencies.
@@ -130,6 +154,7 @@ specs/*.toml, bullets/*.toml ──▶ specs.py      load, fill defaults, valida
    ```sh
    python tests/test_specs_and_profiles.py
    python tools/gen_specs_md.py
+   blender --background --factory-startup --python tests/test_addon.py   # add-on smoke test, ~50 s
    ```
 
 The loader rejects specs that can't be built (a bullet seated past the web, a loaded length
@@ -159,8 +184,7 @@ practice (`223 REM`, `45 AUTO`, …). Change `[headstamp]` in a spec to use your
   scattered (lying) layouts for field scenes
 - Case variations: steel (lacquered and polymer coated), aluminium, nickel plated
 - More bullet types: hollow point, soft point, polymer tip, lead round nose, wadcutter
-- More cartridges, and a Blender add-on panel to build and re-roll copies without the
-  command line
+- More cartridges
 
 ## License
 

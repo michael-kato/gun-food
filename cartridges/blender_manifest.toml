@@ -1,0 +1,17 @@
+schema_version = "1.0.0"
+
+id = "gun_food"
+version = "0.2.0"
+name = "Gun Food Cartridges"
+tagline = "SAAMI-accurate cartridges with seeded per-copy variation"
+maintainer = "Michael Kato"
+type = "add-on"
+website = "https://github.com/michael-kato/gun-food"
+tags = ["Add Mesh", "Modeling"]
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:MIT"]
+
+[build]
+paths_exclude_pattern = ["__pycache__/", "*.pyc"]

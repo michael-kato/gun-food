@@ -300,7 +300,7 @@ def sample_case(cart: Cartridge, rng: random.Random, cond: Condition) -> CaseSpe
         rim_thickness=_band(rng, k.rim_thickness, cart.tol("rim_thickness_tol"), "rim"),
         shoulder_radius=k.shoulder_radius * soft,
         neck_radius=k.neck_radius * soft,
-        rim_chamfer=min(0.40, k.rim_chamfer * soft),
+        head_chamfer=k.head_chamfer * soft,
     )
     if k.bottleneck:
         new["shoulder_dia"] = _band(rng, k.shoulder_dia, body, "diameter", die)

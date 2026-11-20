@@ -138,27 +138,30 @@ def case_profile(c: CaseSpec, crimp: Crimp | None = None, seg: int = 5):
     pd = c.pocket_depth
     fh = c.flash_hole_dia / 2
     floor = pd + c.web
-    f = c.rim_chamfer * t
+    hc = min(c.head_chamfer, 0.3 * t)
     pts = [
         (fh, pd, 0, m),
         (rp, pd, 0.25, m),
         (rp, 0.15, 0.03, m),
         (rp + 0.15, 0.0, 0.03, m),  # pocket mouth chamfer
-        (R - f, 0.0, 0.06, m),  # head-side rim chamfer, edges just broken
-        (R, f, 0.06, m),
-        (R, t, 0.10, m),
+        (R - hc, 0.0, 0.03, m),  # head-side edge of the rim, just broken
+        (R, hc, 0.03, m),
     ]
     if c.rimless:
+        # SAAMI / C.I.P.: the rim's outer face, a bevel (f long, alpha from the axis) into the
+        # rim's flat front face at the rim thickness, the groove bottom, the ramp (beta) to the body
         G, E = c.groove_dia / 2, c.groove_top
-        rim_dz = (R - G) * math.tan(math.radians(c.rim_bevel_angle))
-        front_dz = (P1 - G) / math.tan(math.radians(c.groove_front_angle))
-        room = E - t - 0.25  # keep at least a 0.25 mm flat at the groove bottom
-        if rim_dz + front_dz > room:
-            k = room / (rim_dz + front_dz)
-            rim_dz, front_dz = rim_dz * k, front_dz * k
-        pts += [(G, t + rim_dz, 0.10, m), (G, E - front_dz, 0.20, m), (P1, E, 0.35, m)]
+        f = min(c.rim_bevel, t - hc - 0.05)
+        inset = min(f * math.tan(math.radians(c.rim_bevel_angle)), R - G)
+        pts += [(R, t - f, 0.04, m)]
+        if R - inset - G > 0.03:
+            pts += [(R - inset, t, 0.04, m), (G, t, 0.08, m)]
+        else:  # the bevel runs all the way down to the groove
+            pts += [(G, t, 0.08, m)]
+        front_dz = min((P1 - G) / math.tan(math.radians(c.groove_front_angle)), E - t - 0.25)
+        pts += [(G, E - front_dz, 0.15, m), (P1, E, 0.30, m)]
     else:
-        pts += [(P1, t, 0.30, m)]
+        pts += [(R, t, 0.10, m), (P1, t, 0.30, m)]
     if c.bottleneck:
         P2 = c.shoulder_dia / 2
         pts += [(P2, c.shoulder_start, c.shoulder_radius, m), (H1, c.neck_start, c.neck_radius, m)]

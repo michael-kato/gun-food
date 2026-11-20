@@ -338,7 +338,7 @@ def headstamp_tools(cart, cp, rng: random.Random):
     pocket = case.primer_cup_dia / 2 + 0.02
     crimp = lot.primer_crimp
     inner = pocket + {"ring": 0.62, "stakes": 0.72}.get(crimp, 0.35)
-    outer = case.rim_dia / 2 - case.rim_chamfer * case.rim_thickness - 0.22
+    outer = case.rim_dia / 2 - case.head_chamfer - 0.30
     radius = (inner + outer) / 2
     cap = (hs.size or min(1.6, (outer - inner) * 0.72)) * st.size
     placed, taken = [], []

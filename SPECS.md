@@ -22,7 +22,12 @@ SAAMI's minus tolerance: `19.15 −0.25` means a real case measures between 18.9
 | Rim diameter (R1) | 10.01 −0.25 | 9.6 −0.25 | 12.19 −0.25 | 10.77 −0.25 | 9.5 −0.25 | 11.35 −0.25 | 12.01 −0.25 | 9.6 −0.25 | 7.06 −0.3 |
 | Rim thickness (R) | 1.27 −0.25 | 1.14 −0.25 | 1.24 −0.25 | 1.4 −0.25 | 1.14 −0.25 | 1.45 −0.25 | 1.37 −0.25 | 1.14 −0.25 | 1.09 −0.18 |
 | Extractor groove diameter (E1) | ≈8.81 −0.51 | 8.43 −0.51 | 10.16 −0.25 | ≈8.81 −0.51 | ≈8.36 −0.25 | 9.55 −0.25 | 10.39 −0.51 | 8.43 −0.51 | — |
-| Head to body (E) | ≈3.17 | 3.13 | ≈3.14 | ≈3.3 | ≈3.04 | ≈3.35 | ≈3.27 | 3.15 | — |
+| Head to body (E) | ≈2.97 | 3.13 | ≈3.52 | ≈3.7 | ≈2.85 | ≈3.12 | ≈3.34 | 3.15 | — |
+| Rim front bevel length (f) | 0.38 | 0.45 | 0.38 | 0.51 | 0.38 | 0.38 | 0.38 | 0.46 | — |
+| Rim front bevel angle (α, °) | 35 | 35 | 35 | 35 | 35 | 35 | 35 | 35 | — |
+| Groove bottom width (e) | ≈0.9 | 0.76 | ≈0.9 | ≈0.9 | ≈0.9 | ≈0.9 | ≈0.9 | ≈0.9 | — |
+| Groove ramp angle (β, °) | 35 | 25 | ≈35 | ≈35 | ≈35 | 48 | 36 | 25 | — |
+| Head edge chamfer | ≈0.15 | ≈0.15 | ≈0.15 | ≈0.15 | ≈0.15 | ≈0.15 | ≈0.15 | ≈0.15 | — |
 | Primer | small-pistol | small-rifle | large-pistol | small-pistol | small-pistol | large-rifle | large-rifle | small-rifle | rimfire |
 
 ## Loaded rounds

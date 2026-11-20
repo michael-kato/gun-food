@@ -16,8 +16,12 @@ rim_thickness = 1.24    # .049 -.010 in
 rim_thickness_tol = 0.25
 groove_dia = 10.16      # .400 -.010 in
 groove_dia_tol = 0.25
+rim_bevel = 0.38       # rim front bevel at 35 deg: SAAMI rim .049 - land .034 in
+rim_bevel_angle = 35    # SAAMI 35 deg +20, from the case axis
+groove_front_angle = 35  # groove ramp to the body: not labelled on the drawing; as 9mm
 primer = "large-pistol"
 web = 1.7
+approx = ["groove_front_angle"]
 
 [loaded]
 bullet = "452-230-fmj-rn"

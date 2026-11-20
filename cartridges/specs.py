@@ -13,7 +13,8 @@ them as estimated.
 
 Naming follows C.I.P./SAAMI drawings: L1 shoulder_start, L2 neck_start, L3 length,
 P1 base_dia, P2 shoulder_dia, H1 mouth_dia (neck), R1 rim_dia, R rim_thickness,
-E groove_top, E1 groove_dia.
+E groove_top, E1 groove_dia, f rim_bevel, e groove_width, alpha rim_bevel_angle,
+beta groove_front_angle.
 
 Pure Python (no bpy): usable and testable outside Blender.
 """
@@ -81,10 +82,16 @@ class CaseSpec:
     neck_radius: float = 1.0  # fillet where shoulder meets neck
     # Extractor groove (rimless cases); defaults derived in finalize()
     groove_dia: float | None = None  # E1
-    groove_top: float | None = None  # E, head to start of body
-    rim_bevel_angle: float = 35.0  # rim front bevel, from the radial plane
-    groove_front_angle: float = 25.0  # groove ramp up to the body, from the axis
-    rim_chamfer: float = 0.32  # head-side rim chamfer, as a fraction of rim thickness
+    groove_top: float | None = None  # E, head to start of body; default from the groove below
+    # Rim and groove shape (rimless cases), as SAAMI and C.I.P. draw it: the rim's outer face
+    # runs from the head for (rim_thickness - rim_bevel), a bevel at rim_bevel_angle takes the
+    # front edge in to the rim's flat front face at rim_thickness, then the groove bottom
+    # (at least groove_width) and a ramp at groove_front_angle up to the body at groove_top.
+    rim_bevel: float = 0.38  # C.I.P. f: axial length of the rim's front bevel (SAAMI: rim thickness minus rim land)
+    rim_bevel_angle: float = 35.0  # C.I.P. alpha: rim front bevel, from the case axis
+    groove_width: float = 0.90  # C.I.P. e: flat bottom of the extractor groove (.223: 0.76 minimum)
+    groove_front_angle: float = 25.0  # C.I.P. beta: groove ramp up to the body, from the case axis
+    head_chamfer: float = 0.15  # mm, the head-side edge of the rim; not in the standards, edge just broken
     # Construction details, not in standards
     mouth_wall: float = 0.30
     base_wall: float = 0.90
@@ -285,8 +292,11 @@ def finalize(c: Cartridge) -> Cartridge:
     if k.rimless:
         if k.groove_dia is None:
             k.groove_dia = round(k.rim_dia * 0.86, 2)
-        if k.groove_top is None:
-            k.groove_top = round(k.rim_thickness + 1.9, 2)
+        if not (0.0 <= k.rim_bevel < k.rim_thickness):
+            raise SpecError(f"{w}: rim_bevel must be shorter than the rim thickness")
+        if k.groove_top is None:  # C.I.P.: E = R + e + ramp
+            ramp = (k.base_dia - k.groove_dia) / 2 / math.tan(math.radians(k.groove_front_angle))
+            k.groove_top = round(k.rim_thickness + k.groove_width + ramp, 2)
         if not (k.groove_dia < k.base_dia and k.groove_top > k.rim_thickness):
             raise SpecError(f"{w}: extractor groove must be narrower than the body and above the rim")
     # tolerances: record which ones fell back to class defaults

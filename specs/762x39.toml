@@ -20,6 +20,9 @@ rim_thickness = 1.45    # .057 -.010 in
 rim_thickness_tol = 0.25
 groove_dia = 9.55       # .376 -.010 in
 groove_dia_tol = 0.25
+rim_bevel = 0.38       # rim front bevel at 35 deg: SAAMI rim .057 - land .042 in
+rim_bevel_angle = 35    # SAAMI 35 deg +20, from the case axis
+groove_front_angle = 48  # groove ramp to the body: SAAMI 48 deg -6
 primer = "large-rifle"
 web = 2.4
 

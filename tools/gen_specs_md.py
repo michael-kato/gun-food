@@ -28,6 +28,11 @@ CASE_ROWS = [
     ("rim_thickness", "Rim thickness (R)", "rim_thickness_tol"),
     ("groove_dia", "Extractor groove diameter (E1)", "groove_dia_tol"),
     ("groove_top", "Head to body (E)", None),
+    ("rim_bevel", "Rim front bevel length (f)", None),
+    ("rim_bevel_angle", "Rim front bevel angle (α, °)", None),
+    ("groove_width", "Groove bottom width (e)", None),
+    ("groove_front_angle", "Groove ramp angle (β, °)", None),
+    ("head_chamfer", "Head edge chamfer", None),
 ]
 BULLET_ROWS = [
     ("dia", "Diameter (max)"),
@@ -49,7 +54,7 @@ def _applies(c, name):
     k = c.case
     if name in ("shoulder_dia", "shoulder_start", "neck_start") and not k.bottleneck:
         return False
-    if name in ("groove_dia", "groove_top") and not k.rimless:
+    if name in ("groove_dia", "groove_top", "rim_bevel", "rim_bevel_angle", "groove_width", "groove_front_angle", "head_chamfer") and not k.rimless:
         return False
     return True
 

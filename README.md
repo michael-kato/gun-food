@@ -115,6 +115,11 @@ specs/*.toml, bullets/*.toml ──▶ specs.py      load, fill defaults, valida
   .300 Blackout both take .308" bullets. Noses are tangent ogives with a rounded tip
   (folded FMJ jacket) or a flat meplat (flat point); optional boat tail, cannelure, open
   lead base and heel (.22 LR).
+- **Rims and extractor grooves** follow the SAAMI and C.I.P. drawings per cartridge: the
+  rim's outer face, a 35° bevel inside the rim thickness (its length is the drawing's rim
+  thickness minus rim land), the rim's flat front face, the groove bottom and a ramp up to
+  the body at the cartridge's angle (25° on .223, 36° on .308, 48° on 7.62×39). The
+  head-side edge is only broken (0.15 mm); the standards don't chamfer it.
 - **Crimps.** Loaded pistol rounds get a taper crimp; rifle rounds are roll-crimped into the
   bullet's cannelure, which sets their seating depth; the .22 LR is crimped onto its heel.
   Empty cases stay uncrimped.

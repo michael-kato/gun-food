@@ -30,8 +30,8 @@ oal = 28.58             # typical factory 180 gr FMJ (1.125 in)
 oal_min = 27.56         # 1.085 in
 oal_max = 28.83         # 1.135 in
 crimp = "taper"
-crimp_amount = 0.06
-crimp_length = 2.5
+crimp_amount = 0.05
+crimp_length = 4.0
 approx = ["oal", "crimp_amount"]
 
 [headstamp]

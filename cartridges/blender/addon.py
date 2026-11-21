@@ -188,6 +188,7 @@ class _Maker:
         cp.soot_in = min(1.0, cp.soot_in * s.soot_scale)
         cp.soot_out = min(1.0, cp.soot_out * s.soot_scale)
         cp.age = min(1.0, cp.age * s.age_scale)
+        cp.bullet_age = min(1.0, cp.bullet_age * s.age_scale)
         cp.wear = min(1.0, cp.wear * s.wear_scale)
         colls = colls or [_collection(self.context, cart.key)]
         root = sc.make_copy(colls[0], f"{cart.key}.{kind}.{seed}", cart, cp, self.primers, location, rot_z, {})

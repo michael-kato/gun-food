@@ -165,11 +165,11 @@ def case_profile(c: CaseSpec, crimp: Crimp | None = None, seg: int = 5):
     if c.bottleneck:
         P2 = c.shoulder_dia / 2
         pts += [(P2, c.shoulder_start, c.shoulder_radius, m), (H1, c.neck_start, c.neck_radius, m)]
-    if crimp:
-        pts += [(H1, L - lc, 0.30, m)]
+    if crimp:  # a taper crimp closes the mouth gradually over its length, like the die's long taper
+        pts += [(H1, L - lc, 1.5 if crimp.kind == "taper" else 0.30, m)]
     pts += [
-        (H1 - d, L - 0.12, 0, m),
-        (H1 - d - 0.10, L, 0, m),  # mouth chamfer, outside
+        (H1 - d, L - 0.10, 0, m),
+        (H1 - d - 0.04, L, 0, m),  # mouth chamfer, outside: barely broken on factory brass
         (H1 - d - mw + 0.06, L, 0, m),
         (H1 - d - mw, L - 0.10, 0, m),  # mouth chamfer, inside
     ]
@@ -194,6 +194,22 @@ def _ogive_flat(r, m, z0, length, seg):
         dz = length * math.sin(i / seg * math.pi / 2)
         out.append(((r - rho) + math.sqrt(max(rho**2 - dz**2, 0.0)), z0 + dz))
     out[-1] = (m, z0 + length)
+    return out
+
+
+def nose_elliptic(r, z0, length, power, seg):
+    """Pistol round nose: a superellipse quarter from radius r at z0 to the tip on the axis.
+
+    Tangent to the bearing surface, and its curvature grows gradually up to a blunt, smooth tip
+    (radius of curvature r**2 / length for an ellipse), where a tangent ogive into a small tip
+    sphere looks pointed. ``power`` 2 is an ellipse; higher is fuller, lower more pointed.
+    """
+    e = 2.0 / power
+    out = []
+    for i in range(1, seg + 1):
+        t = math.pi / 2 * i / seg
+        out.append((r * math.cos(t) ** e, z0 + length * math.sin(t) ** e))
+    out[-1] = (0.0, z0 + length)
     return out
 
 
@@ -251,7 +267,10 @@ def bullet_profile(b: BulletSpec, seat_depth: float | None = None, seg: int = 32
         pts += [(r, cz - w / 2, 0.05, J), (r - d, cz - w / 2 + 0.12, 0, J), (r - d, cz + w / 2 - 0.12, 0, J), (r, cz + w / 2, 0.05, J)]
     z_nose = L - b.nose_length
     pts.append((r, z_nose, 0, J))
-    if b.tip == "round":
+    if b.tip == "elliptic":
+        for pr, pz in nose_elliptic(r, z_nose, b.nose_length, b.nose_power, seg):
+            pts.append((pr, pz, 0, J))
+    elif b.tip == "round":
         for pr, pz in _ogive_round_points(r, b.tip_dia / 2, z_nose, b.nose_length, seg):
             pts.append((pr, pz, 0, J))
     else:

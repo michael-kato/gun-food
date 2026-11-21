@@ -38,7 +38,7 @@ SAAMI's minus tolerance: `19.15 −0.25` means a real case measures between 18.9
 | Overall length, SAAMI min–max | 25.4–29.69 | 53.98–57.4 | 30.23–32.39 | 27.56–28.83 | 23.11–24.99 | 54.61–55.88 | 63.25–71.37 | 45.21–57.4 | 24.13–25.4 |
 | Overall length, as built | 29.21 | 56.90 (cannelure) | 32.00 | 28.58 | 24.89 | 55.60 (cannelure) | 70.60 (cannelure) | 53.00 (cannelure) | 25.02 |
 | Seating depth | 4.44 | 6.60 | 8.11 | 8.01 | 3.68 | 10.01 | 9.08 | 6.35 | 3.30 |
-| Crimp | taper, ≈0.06 on dia | roll, ≈0.15 on dia | taper, ≈0.06 on dia | taper, ≈0.06 on dia | taper, ≈0.06 on dia | roll, ≈0.15 on dia | roll, ≈0.15 on dia | roll, ≈0.15 on dia | roll, ≈0.1 on dia |
+| Crimp | taper, ≈0.05 on dia | roll, ≈0.15 on dia | taper, ≈0.06 on dia | taper, ≈0.05 on dia | taper, ≈0.05 on dia | roll, ≈0.15 on dia | roll, ≈0.15 on dia | roll, ≈0.15 on dia | roll, ≈0.1 on dia |
 | Maximum bullet diameter | 9.03 | 5.702 | 11.481 | 10.173 | 9.055 | 7.9 | 7.85 | 7.85 | 5.728 |
 
 Roll-crimped rounds seat with the case mouth in the bullet's cannelure, so their length follows the
@@ -54,11 +54,12 @@ are SAAMI maximums with SAAMI's tolerance; **shapes are typical factory bullets,
 |---|---|---|---|---|---|---|---|---|---|
 | Bullet | .22 40 gr copper-plated round nose (heeled) | .224 55 gr FMJ boat tail | .308 125 gr FMJ | .308 150 gr FMJ boat tail | .311 123 gr FMJ boat tail | 9mm 115 gr FMJ round nose | 9mm 95 gr FMJ round nose | .40 180 gr FMJ flat point | .45 230 gr FMJ round nose |
 | Used by | .22 Long Rifle | .223 Remington | .300 AAC Blackout | .308 Winchester | 7.62×39mm | 9mm Luger | .380 ACP | .40 S&W | .45 ACP |
-| Tip | round | round | round | round | round | round | round | flat | round |
+| Tip | round | round | round | round | round | elliptic | elliptic | flat | elliptic |
 | Diameter (max) | 5.728 −0.102 | 5.702 −0.076 | 7.85 −0.08 | 7.85 −0.08 | 7.9 −0.05 | 9.03 −0.076 | 9.03 −0.076 | 10.173 −0.076 | 11.481 −0.076 |
 | Length | 12.75 ±0.102 | 18.8 ±0.15 | 24.6 ±0.196 | 28.5 ±0.228 | 26.8 ±0.214 | 14.5 ±0.116 | 11.3 ±0.09 | 15 ±0.12 | 17.3 ±0.138 |
-| Nose (ogive) length | 5.6 | 11.3 | 14.5 | 17 | 15.8 | 7.4 | 6.3 | 5.6 | 9.2 |
-| Tip diameter | 2.4 | 0.9 | 1 | 1 | 1 | 3.2 | 3 | 5.6 | 4 |
+| Nose (ogive) length | 5.6 | 11.3 | 14.5 | 17 | 15.8 | 8.6 | 7 | 5.6 | 9 |
+| Tip diameter | 2.4 | 0.9 | 1 | 1 | 1 | — | — | 5.6 | — |
+| Nose fullness (elliptic) | — | — | — | — | — | 1.9 | 1.9 | — | 2.1 |
 | Boat-tail length | — | 1.5 | — | 2.6 | 2.5 | — | — | — | — |
 | Boat-tail half-angle (°) | — | 9 | — | 9 | 10 | — | — | — | — |
 | Cannelure, from base | — | 6.25 | 6 | 8.73 | 9.66 | — | — | — | — |
@@ -98,21 +99,26 @@ sets the headstamp, case and primer finish, primer sealant, primer crimp, anneal
 age and, on loaded rounds, bullet jacket and tip paint. Commercial marks are made up; `LC`
 is the US Army's Lake City plant; the Eastern-bloc numbers are arsenal codes.
 
-| Maker | Headstamp | Case | Primer | Sealant | Primer crimp | Tip | Share per cartridge |
-|---|---|---|---|---|---|---|---|
-| **cmx**<br>CMX (placeholder commercial) | `CMX`@12 · `{caliber}`@6 | brass 82%, nickel 18% | nickel 67%, brass 33% | none 75%, blue 12%, green 12% | none | none | 9mm 33%, 223 20%, 45ACP 38%, 40CAL 38%, 380ACP 38%, 762x39 21%, 308 27%, 300blackout 50% |
-| **gunfood**<br>Gun Food house brand | `GUN FOOD`@12 · `{caliber}`@6 | brass | nickel | none | none | none | 9mm 22%, 223 13%, 45ACP 25%, 40CAL 25%, 380ACP 25%, 762x39 14%, 308 18%, 300blackout 33% |
-| **kva**<br>K V A (placeholder, spaced letters, pistol) | `K V A`@12 · `{caliber}`@6 | brass 67%, nickel 22%, aluminum 11% | nickel 75%, brass 25% | none | none | none | 9mm 22%, 45ACP 25%, 40CAL 25%, 380ACP 25% |
-| **lc**<br>Lake City, commercial | `LC`@12 · `{yy}`@9 · `{caliber}`@5 | brass | brass 67%, nickel 33% | none 75%, red 25% | none | none | 223 20%, 308 18% |
-| **lc-m855**<br>Lake City, military 5.56 NATO | `LC`@12 · `{yy}`@6 · ⟨nato⟩@3 + 0–3 dots | brass | brass | purple 75%, red 25% | ring | green 43%, lightgreen 14%, none 43% | 223 20% |
-| **lc-m80**<br>Lake City, military 7.62 NATO | `LC`@12 · `{yy}`@6 · ⟨nato⟩@3 + 0–2 dots | brass | brass | red 67%, purple 33% | ring | none 86%, red 14% | 308 27% |
-| **zm**<br>ZM, foreign military 5.56 | `ZM`@1 · `{yy}`@6 · `{military}`@10 | brass | brass | magenta 67%, red 33% | ring | green 33%, none 67% | 223 13% |
-| **sever**<br>SEVER (placeholder, steel case) | `SEVER`@12 · `{caliber}`@6 · ⟨ring⟩@3 | steel-polymer 75%, steel-lacquer 25% | brass | red 75%, none 25% | none | none | 9mm 22%, 223 13%, 45ACP 12%, 40CAL 12%, 380ACP 12%, 762x39 43%, 308 9%, 300blackout 17% |
-| **arsenal**<br>Eastern-bloc military (factory code and year) | `{code}`@12 · `{yy}`@6 | steel-lacquer 75%, brass 25% | brass | red 67%, purple 33% | stakes | none | 762x39 21% |
-| **rim-m**<br>M (placeholder rimfire) | `M`@0 | brass 75%, nickel 25% | spec | none | none | none | 22LR 67% |
-| **rim-g**<br>G (placeholder rimfire) | `G`@0 | brass | spec | none | none | none | 22LR 33% |
+| Maker | Headstamp | Case | Primer | Sealant | Primer crimp | Jacket | Tip | Share per cartridge |
+|---|---|---|---|---|---|---|---|---|
+| **cmx**<br>CMX (placeholder commercial) | `CMX`@12 · `{caliber}`@6 | brass 82%, nickel 18% | nickel 67%, brass 33% | none 75%, blue 12%, green 12% | none | spec | none | 9mm 27%, 223 20%, 45ACP 30%, 40CAL 30%, 380ACP 30%, 762x39 21%, 308 27%, 300blackout 50% |
+| **gunfood**<br>Gun Food house brand *(pristine)* | `GUN FOOD`@12 · `{caliber}`@6 | brass | nickel | none | none | spec | none | 9mm 18%, 223 13%, 45ACP 20%, 40CAL 20%, 380ACP 20%, 762x39 14%, 308 18%, 300blackout 33% |
+| **kva**<br>K V A (placeholder, spaced letters, pistol) | `K V A`@12 · `{caliber}`@6 | brass 67%, nickel 22%, aluminum 11% | nickel 75%, brass 25% | none | none | gilding-metal 67%, copper 33% | none | 9mm 18%, 45ACP 20%, 40CAL 20%, 380ACP 20% |
+| **brx**<br>BRX (placeholder, brass-jacketed pistol, as some European and Brazilian makers load) | `BRX`@12 · `{caliber}`@6 | brass 80%, nickel 20% | brass 50%, nickel 50% | none | none | brass | none | 9mm 18%, 45ACP 20%, 40CAL 20%, 380ACP 20% |
+| **lc**<br>Lake City, commercial | `LC`@12 · `{yy}`@9 · `{caliber}`@5 | brass | brass 67%, nickel 33% | none 75%, red 25% | none | spec | none | 223 20%, 308 18% |
+| **lc-m855**<br>Lake City, military 5.56 NATO | `LC`@12 · `{yy}`@6 · ⟨nato⟩@3 + 0–3 dots | brass | brass | purple 75%, red 25% | ring | spec | green 43%, lightgreen 14%, none 43% | 223 20% |
+| **lc-m80**<br>Lake City, military 7.62 NATO | `LC`@12 · `{yy}`@6 · ⟨nato⟩@3 + 0–2 dots | brass | brass | red 67%, purple 33% | ring | spec | none 86%, red 14% | 308 27% |
+| **zm**<br>ZM, foreign military 5.56 | `ZM`@1 · `{yy}`@6 · `{military}`@10 | brass | brass | magenta 67%, red 33% | ring | spec | green 33%, none 67% | 223 13% |
+| **sever**<br>SEVER (placeholder, steel case) | `SEVER`@12 · `{caliber}`@6 · ⟨ring⟩@3 | steel-polymer 75%, steel-lacquer 25% | brass | red 75%, none 25% | none | spec | none | 9mm 18%, 223 13%, 45ACP 10%, 40CAL 10%, 380ACP 10%, 762x39 43%, 308 9%, 300blackout 17% |
+| **arsenal**<br>Eastern-bloc military (factory code and year) | `{code}`@12 · `{yy}`@6 | steel-lacquer 75%, brass 25% | brass | red 67%, purple 33% | stakes | spec | none | 762x39 21% |
+| **rim-m**<br>M (placeholder rimfire) | `M`@0 | brass 75%, nickel 25% | spec | none | none | copper 75%, lead 25% | none | 22LR 50% |
+| **rim-gf**<br>GF (Gun Food house brand, rimfire) *(pristine)* | `GF`@0 | brass | spec | none | none | copper | none | 22LR 25% |
+| **rim-g**<br>G (placeholder rimfire) | `G`@0 | brass | spec | none | none | copper 50%, lead 50% | none | 22LR 25% |
 
 Tip paint goes on loaded rounds only. Annealing stains show on brass bottleneck cases only.
+New ammo carries some factory tarnish, except from a *pristine* maker (one per cartridge):
+showroom-clean cases and bright bullets. Bullet tarnish follows the jacket: brass stays
+bright, gilding metal varies, plated copper comes dull.
 
 ## Sources and notes
 

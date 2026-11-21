@@ -18,6 +18,13 @@ Every copy is a *realization* of its spec, drawn from a seed:
 * **Maker** (``makers.toml``, see ``sample_lot``): headstamp, case and primer finish,
   sealant, primer crimp, annealing stain, age, bullet jacket and tip paint. Drawn from
   its own random stream, so makers can be added without reshuffling the dimensions.
+  New ammo always carries some factory tarnish (``Condition.age``), except from a
+  ``pristine`` maker, which stays showroom-clean.
+* **Bullet tarnish** follows the jacket (``JACKET_AGE``): brass jackets stay bright,
+  drawn gilding metal ranges from bright to dull, plated copper comes dull.
+* **Micro relief** (``Copy.micro``): a few microns of waviness on every case and bullet,
+  stronger at the edges, so reflections never look machined-perfect; plus the odd small,
+  sharp ding (``Condition.dings``).
 
 Pure Python, deterministic for a given seed.
 """
@@ -72,6 +79,10 @@ class Condition:
     mouth_ding_radius: tuple[float, float] = (0.6, 1.6)  # mm
     age: tuple[float, float] = (0.0, 0.0)  # material: tarnish at least this (the maker sets the rest)
     wear: tuple[float, float] = (0.0, 0.35)  # material: scuffs and scratches along the case
+    micro: tuple[float, float] = (0.7, 1.0)  # mesh: scale on the micro relief (see mesh.micro_relief)
+    dings: float = 0.0  # mean count of small sharp dings per case (bullets get a third as many)
+    ding_radius: tuple[float, float] = (0.55, 0.9)  # mm; the lathe's ~0.5 mm vertex spacing carries no smaller
+    ding_depth: tuple[float, float] = (0.015, 0.04)  # mm
 
 
 CONDITIONS = {
@@ -87,6 +98,8 @@ CONDITIONS = {
         tip_ding_chance=0.3,
         edge_softening=(1.0, 1.12),
         dirt=(0.06, 0.18),
+        dings=0.7,
+        age=(0.15, 0.4),  # boxed ammo is never mirror-bright: toning, water spots, handling
     ),
     "fired": Condition(
         name="fired",
@@ -103,6 +116,9 @@ CONDITIONS = {
         dirt=(0.15, 0.6),  # range pickups: dust and the odd smear of soil, not caked mud
         age=(0.65, 1.0),
         wear=(0.45, 1.0),
+        micro=(1.0, 1.6),
+        dings=2.5,
+        ding_depth=(0.02, 0.06),
         soot_in=(0.6, 1.0),
         soot_out=(0.4, 1.0),
         fired=True,
@@ -115,6 +131,18 @@ CONDITIONS = {
         rim_strike_depth=(0.20, 0.40),
         extractor_nick_chance=0.7,
     ),
+}
+
+
+# Bullet tarnish (0-1) by jacket metal, before the lot's own age is added. Brass jackets
+# hold their shine; drawn gilding-metal jackets vary; plated copper is soft and matte from
+# the plating bath and oxidizes faster than brass, so it comes dull.
+JACKET_AGE = {
+    "brass": (0.0, 0.12),
+    "nickel": (0.0, 0.08),
+    "gilding-metal": (0.05, 0.55),
+    "copper": (0.35, 0.8),
+    "lead": (0.3, 0.9),
 }
 
 
@@ -133,7 +161,9 @@ class Lot:
     smear: float  # 0-1, how far the sealant runs over the primer face
     primer_crimp: str
     anneal: float  # 0-1, neck and shoulder annealing stain
+    anneal_colour: str  # plain (brown to blue-grey stain) or rainbow (heat-tint interference colours)
     age: float  # 0-1, tarnish
+    pristine: bool  # showroom-clean when new
     jacket: str
     tip: str  # "none" or a [paints] name
     tip_rgb: tuple[float, float, float]
@@ -190,7 +220,9 @@ def sample_lot(cart: Cartridge, rng: random.Random, kind: str, makers: specs.Mak
         smear=rng.uniform(*m.smear) if sealant != "none" else 0.0,
         primer_crimp=m.primer_crimp,
         anneal=rng.uniform(*m.anneal) if cart.case.bottleneck and case_metal == "brass" else 0.0,
+        anneal_colour=_choose(rng, m.anneal_colour),
         age=rng.uniform(*m.age),
+        pristine=m.pristine,
         jacket=_choose(rng, m.jacket) if m.jacket else cart.bullet.jacket,
         tip=tip,
         tip_rgb=makers.paints.get(tip, (0.0, 0.0, 0.0)),
@@ -204,6 +236,7 @@ class Dent:
     theta: float  # radians
     radius: float  # mm, on the surface
     depth: float  # mm, inward
+    sharp: bool = False  # a ding: steep walls, pointed bottom (a dent is a smooth dish)
 
 
 @dataclass
@@ -232,6 +265,8 @@ class Copy:
     age: float = 0.0  # tarnish, 0-1
     wear: float = 0.0  # scratches, 0-1
     tip_length: float = 0.0  # mm of painted tip
+    bullet_age: float = 0.0  # bullet tarnish, 0-1
+    micro: float = 1.0  # scale on the micro relief
 
     def labels(self) -> dict:
         """Flat values worth storing on the object (training labels, debugging)."""
@@ -243,6 +278,7 @@ class Copy:
             "headstamp": self.lot.headstamp_text if self.lot else "",
             "case_metal": self.case.material,
             "age": round(self.age, 3),
+            "pristine": bool(self.lot and self.lot.pristine),
             "wear": round(self.wear, 3),
             "case_length": round(self.case.length, 4),
             "case_rim_dia": round(self.case.rim_dia, 4),
@@ -253,8 +289,10 @@ class Copy:
         }
         if not self.case.rimfire and self.lot:
             out.update(primer_metal=self.lot.primer_metal, sealant=self.lot.sealant)
+        if self.lot and self.lot.anneal > 0:
+            out.update(anneal=round(self.lot.anneal, 3), anneal_colour=self.lot.anneal_colour)
         if self.kind in ("loaded", "bullet"):
-            out.update(bullet_dia=round(self.bullet.dia, 4), bullet_length=round(self.bullet.length, 4), jacket=self.bullet.jacket)
+            out.update(bullet_dia=round(self.bullet.dia, 4), bullet_length=round(self.bullet.length, 4), jacket=self.bullet.jacket, bullet_age=round(self.bullet_age, 3))
             if self.lot and self.lot.tip != "none":
                 out.update(tip=self.lot.tip)
         if self.kind == "loaded":
@@ -354,6 +392,13 @@ def _dents(rng, count, z_range, radius, depth):
     return out
 
 
+def _dings(rng, count, z_range, cond: Condition):
+    lo, hi = z_range
+    if hi <= lo:
+        return []
+    return [Dent(rng.uniform(lo, hi), rng.uniform(0, 2 * math.pi), rng.uniform(*cond.ding_radius), rng.uniform(*cond.ding_depth), sharp=True) for _ in range(count)]
+
+
 def realize(
     cart: Cartridge,
     seed: int,
@@ -415,6 +460,13 @@ def realize(
     if kind == "bullet":  # loose bullets knock into each other on the bearing surface too
         bullet_dents += _dents(rng, _poisson(rng, 0.8), (0.5, bullet.length - bullet.nose_length), (0.4, 1.2), (0.005, 0.03))
 
+    # the odd small, sharp ding, from its own stream so the dimensions above never reshuffle
+    drng = random.Random(copy_seed(seed, "dings"))
+    case_dents += _dings(drng, _poisson(drng, cond.dings), (body_lo, case.length - 0.5), cond)
+    if kind in ("loaded", "bullet"):
+        lo = seat if kind == "loaded" else 0.5
+        bullet_dents += _dings(drng, _poisson(drng, cond.dings / 3), (lo + 0.3, bullet.length - 1.0), cond)
+
     return Copy(
         seed=seed,
         kind=kind,
@@ -435,10 +487,19 @@ def realize(
         soot_out=rng.uniform(*cond.soot_out) if case.bottleneck or rng.random() < 0.5 else 0.0,
         headstamp_seed=rng.randrange(1 << 30),
         lot=lot,
-        age=max(lot.age, lot_rng.uniform(*cond.age)),
+        age=lot.age if lot.pristine and not cond.fired else max(lot.age, lot_rng.uniform(*cond.age)),
         wear=lot_rng.uniform(*cond.wear),
         tip_length=lot_rng.uniform(0.28, 0.38) * bullet.nose_length if lot.tip != "none" else 0.0,
+        bullet_age=_bullet_age(lot, bullet.jacket, lot_rng),
+        micro=lot_rng.uniform(*cond.micro) * (0.5 if lot.pristine and not cond.fired else 1.0),
     )
+
+
+def _bullet_age(lot: Lot, jacket: str, rng: random.Random) -> float:
+    """Tarnish on the bullet: set by its jacket, plus some of the lot's own age."""
+    lo, hi = JACKET_AGE.get(jacket, (0.05, 0.4))
+    x = rng.uniform(lo, hi)
+    return 0.0 if lot.pristine else min(1.0, x + 0.4 * lot.age)
 
 
 # ---------------------------------------------------------------- surface displacement
@@ -450,7 +511,8 @@ def _dent_offset(dents, r, z, theta):
         dth = (theta - d.theta + math.pi) % (2 * math.pi) - math.pi
         dist = math.hypot(dth * max(r, 0.5), z - d.z)
         if dist < d.radius:
-            off -= d.depth * 0.5 * (1 + math.cos(math.pi * dist / d.radius))
+            f = 1 - dist / d.radius
+            off -= d.depth * (f * f if d.sharp else 0.5 * (1 + math.cos(math.pi * dist / d.radius)))
     return off
 
 

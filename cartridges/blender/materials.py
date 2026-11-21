@@ -15,6 +15,12 @@ Inside the group:
 * dirt layer: dielectric soil with its own grainy surface; collects in recesses first
 * soot layer: matte carbon inside fired cases (heaviest at the floor) and blow-by
   streaks on the neck
+* coat: a thin tinted clear coat over the metal (``Coat``): the polymer or lacquer on
+  steel cases. Steel shows through it, it has its own orange-peel and mottling, and
+  scratches cut through it to bare steel
+* factory toning: small dark water spots and stains that come with age, so even boxed new
+  ammo isn't mirror-bright (``Age Response`` scales how much a metal shows its age:
+  nickel plating barely tarnishes)
 
 The three layers are complete BSDFs mixed as closures, like Unreal Substrate slabs: masks
 only set coverage, so mask edges never produce half-metallic, pale-looking brass.
@@ -37,6 +43,7 @@ from dataclasses import dataclass
 import bpy
 
 GROUP = "GF Metal"
+GROUP_VERSION = 3  # bump when the group changes: files with an older group get it rebuilt
 
 
 @dataclass(frozen=True)
@@ -53,19 +60,27 @@ class Metal:
     dimples: float = 0.6
     metallic: float = 1.0
     anneal: bool = False
+    coat: float = 0.0  # thin clear coat over the metal (polymer, lacquer), 0-1
+    coat_roughness: float = 0.4
+    coat_tint: tuple[float, float, float] = (1.0, 1.0, 1.0)  # absorption: darkens what shows through
+    age_response: float = 1.0  # how strongly the copy's age shows (tarnish, dulling, spots)
 
 
 METALS: dict[str, Metal] = {
     "brass": Metal((0.88, 0.70, 0.34), (1.00, 0.94, 0.80), 0.15, tarnish=(0.60, 0.44, 0.20), tarnish_amt=0.22, film_nm=40, lines=0.3, specks=0.4, anneal=True),
-    "gilding-metal": Metal((0.93, 0.58, 0.40), (1.00, 0.86, 0.76), 0.18, tarnish=(0.55, 0.30, 0.20), tarnish_amt=0.20, film_nm=40, lines=0.3, specks=0.3, dimples=0.4),
-    "copper": Metal((0.955, 0.637, 0.538), (1.00, 0.86, 0.78), 0.28, tarnish=(0.45, 0.25, 0.18), tarnish_amt=0.35, film_nm=70, lines=0.1, specks=0.4, dimples=0.4),
+    # drawn FMJ jackets: satin, tarnish from bright to dull
+    "gilding-metal": Metal((0.93, 0.58, 0.40), (1.00, 0.86, 0.76), 0.20, tarnish=(0.55, 0.30, 0.20), tarnish_amt=0.18, film_nm=40, lines=0.3, specks=0.3, dimples=0.4),
+    # plated bullets: matte from the plating bath, soft over lead, quick to oxidize
+    "copper": Metal((0.955, 0.637, 0.538), (1.00, 0.86, 0.78), 0.34, roughness_var=0.06, tarnish=(0.40, 0.21, 0.14), tarnish_amt=0.40, film_nm=70, lines=0.0, specks=0.5, dimples=0.7),
     "lead": Metal((0.28, 0.285, 0.30), (0.70, 0.70, 0.72), 0.6, roughness_var=0.08, tarnish=(0.20, 0.20, 0.21), tarnish_amt=0.5, film_nm=0, lines=0.0, specks=0.3, dimples=0.8, metallic=0.75),
-    "nickel": Metal((0.66, 0.61, 0.53), (0.90, 0.88, 0.85), 0.12, tarnish=(0.50, 0.48, 0.45), tarnish_amt=0.1, film_nm=20, lines=0.2),
+    # bright nickel plating: very shiny, but satin rather than chrome; hardly tarnishes
+    "nickel": Metal((0.68, 0.65, 0.59), (0.92, 0.91, 0.89), 0.10, roughness_var=0.03, tarnish=(0.55, 0.52, 0.47), tarnish_amt=0.04, film_nm=10, lines=0.25, specks=0.2, dimples=0.4, age_response=0.35),
     "steel": Metal((0.56, 0.57, 0.58), (0.85, 0.86, 0.88), 0.25, tarnish=(0.35, 0.25, 0.18), tarnish_amt=0.3, film_nm=40),
     "aluminum": Metal((0.91, 0.92, 0.92), (0.97, 0.97, 0.98), 0.32, tarnish=(0.75, 0.76, 0.77), tarnish_amt=0.3, film_nm=0),
-    # steel cases: a grey polymer coat or a green-grey lacquer over the steel (dielectric-ish)
-    "steel-polymer": Metal((0.060, 0.062, 0.060), (0.30, 0.30, 0.30), 0.45, roughness_var=0.06, tarnish=(0.08, 0.08, 0.075), tarnish_amt=0.1, film_nm=0, lines=0.15, specks=0.5, dimples=0.5, metallic=0.25),
-    "steel-lacquer": Metal((0.050, 0.055, 0.032), (0.30, 0.30, 0.26), 0.28, roughness_var=0.05, tarnish=(0.10, 0.09, 0.06), tarnish_amt=0.15, film_nm=0, lines=0.1, specks=0.4, dimples=0.5, metallic=0.2),
+    # steel cases: phosphated steel under a thin, dull grey polymer coat, or under a glossier
+    # olive lacquer. The tint is the coat's absorption; the steel's sheen shows through it.
+    "steel-polymer": Metal((0.52, 0.53, 0.54), (0.80, 0.81, 0.83), 0.50, roughness_var=0.06, tarnish=(0.22, 0.15, 0.10), tarnish_amt=0.05, film_nm=0, lines=0.1, specks=0.5, dimples=0.4, coat=1.0, coat_roughness=0.38, coat_tint=(0.14, 0.145, 0.145), age_response=0.6),
+    "steel-lacquer": Metal((0.52, 0.53, 0.54), (0.80, 0.81, 0.83), 0.38, roughness_var=0.05, tarnish=(0.22, 0.15, 0.10), tarnish_amt=0.08, film_nm=0, lines=0.1, specks=0.4, dimples=0.4, coat=1.0, coat_roughness=0.22, coat_tint=(0.19, 0.18, 0.10), age_response=0.7),
 }
 
 
@@ -87,10 +102,23 @@ INPUTS = [
     ("Specks", "NodeSocketFloat", 0.4),
     ("Micro Dents", "NodeSocketFloat", 0.6),
     ("Annealing", "NodeSocketFloat", 0.0),
+    ("Coat", "NodeSocketFloat", 0.0),
+    ("Coat Roughness", "NodeSocketFloat", 0.4),
+    ("Coat Tint", "NodeSocketColor", (1.0, 1.0, 1.0, 1.0)),
+    ("Age Response", "NodeSocketFloat", 1.0),
 ]
 
 ANNEAL_FRINGE = (0.30, 0.17, 0.10, 1.0)  # straw-brown where the heat faded out
 ANNEAL_CORE = (0.22, 0.21, 0.24, 1.0)  # blue-grey on the neck, where it was hottest
+# heat tint (temper colours of the oxide), from the cool end of the band to the hot neck
+HEAT_TINT = [
+    (0.22, (0.86, 0.64, 0.26, 1.0)),  # straw
+    (0.42, (0.74, 0.42, 0.17, 1.0)),  # gold to bronze
+    (0.60, (0.56, 0.24, 0.24, 1.0)),  # copper-red
+    (0.76, (0.42, 0.22, 0.42, 1.0)),  # purple
+    (1.00, (0.26, 0.32, 0.52, 1.0)),  # blue
+]
+METALS_BRASS_BASE = (0.88, 0.70, 0.34)
 SOIL_DARK = (0.025, 0.019, 0.013, 1.0)
 SOIL_LIGHT = (0.085, 0.064, 0.042, 1.0)
 SOOT = (0.014, 0.013, 0.012, 1.0)
@@ -188,11 +216,16 @@ def _new(name):
 
 
 def metal_group() -> bpy.types.ShaderNodeTree:
-    """The shared ``GF Metal`` node group (built once per file)."""
+    """The shared ``GF Metal`` node group (built once per file, rebuilt in place if outdated)."""
     ng = bpy.data.node_groups.get(GROUP)
-    if ng:
+    if ng and ng.get("gf_version") == GROUP_VERSION:
         return ng
-    ng = bpy.data.node_groups.new(GROUP, "ShaderNodeTree")
+    if ng:  # an older group: rebuild it in place, so every material using it follows
+        ng.nodes.clear()
+        ng.interface.clear()
+    else:
+        ng = bpy.data.node_groups.new(GROUP, "ShaderNodeTree")
+    ng["gf_version"] = GROUP_VERSION
     for name, kind, default in INPUTS:
         sock = ng.interface.new_socket(name, in_out="INPUT", socket_type=kind)
         sock.default_value = default
@@ -239,8 +272,8 @@ def metal_group() -> bpy.types.ShaderNodeTree:
     cavity = g.attr("cavity", x=-1000, y=800)
     zn = g.attr("zn", x=-1400, y=1900)  # height along the case, 0 head .. 1 mouth
     interior = g.attr("interior", x=-1200, y=2700)
-    # per-copy object properties (EEVEE allows 8 such uniforms per material; keep it at 4)
-    age = g.attr("gf_age", "OBJECT", x=-1600, y=650)  # tarnish with age, 0-1
+    # per-copy object properties (EEVEE allows 8 such uniforms per material; keep it at 5)
+    age = g.math("MULTIPLY", g.attr("gf_age", "OBJECT", x=-1800, y=650), gi["Age Response"], -1600, 650, clamp=True)  # tarnish with age, 0-1
     wear = g.attr("gf_wear", "OBJECT", x=-1600, y=-1250)  # scratches and scuffs, 0-1
 
     # ---- age: blotches spread, streaks along the case appear, the tarnish darkens
@@ -271,6 +304,12 @@ def metal_group() -> bpy.types.ShaderNodeTree:
 
     tarnish = g.math("MULTIPLY", g.math("MULTIPLY", g.math("MAXIMUM", blot, streaks, -800, 550), t_amt, -700, 550), unscratched, -600, 550)
 
+    # ---- factory toning: small dark water spots and stains, more and more of them with age
+    spot_fac, _, _, _ = g.noise_rgb(pmm, g.math("ADD", w, 13.0, -1600, 250), 2.2, 2.0, -1400, 250)
+    spot_lo = g.madd(age, -0.06, 0.715, -1200, 250)
+    spots = g.map(spot_fac, spot_lo, g.math("ADD", spot_lo, 0.02, -1100, 200), x=-1000, y=250, smooth=True)
+    spots = g.math("MULTIPLY", g.math("MULTIPLY", spots, g.map(age, 0.03, 0.3, x=-1000, y=150), -850, 250), unscratched, -700, 250)
+
     # ---- metal layer
     rv = gi["Roughness Variation"]
     rough = g.madd(fine, g.math("MULTIPLY", rv, 0.35, -600, 150), gi["Roughness"], -400, 0)
@@ -278,6 +317,7 @@ def metal_group() -> bpy.types.ShaderNodeTree:
     rough = g.madd(lines, 0.04, rough, -100, 0)
     rough = g.madd(specks, 0.10, rough, 50, 0)
     rough = g.madd(tarnish, 0.10, rough, 200, 0)
+    rough = g.madd(spots, 0.12, rough, 240, 0)
     rough = g.madd(age, 0.10, rough, 275, 0)  # old brass is dull all over
     rough = g.madd(scratch, 0.12, rough, 300, -100)
     rough = g.madd(cavity, 0.25, rough, 350, 0)
@@ -289,13 +329,28 @@ def metal_group() -> bpy.types.ShaderNodeTree:
     _sock(dark_t.inputs, "Scale").default_value = 0.30
     t_colour = g.mix(g.math("MULTIPLY", age, 0.9, -600, 950), gi["Tarnish Color"], dark_t.outputs[0], -450, 850)
     colour = g.mix(g.math("MULTIPLY", tarnish, 0.95, -600, 650), gi["Base Color"], t_colour, -300, 650)
+    colour = g.mix(g.math("MULTIPLY", spots, 0.65, -300, 500), colour, dark_t.outputs[0], -150, 600)
     film = g.math("MULTIPLY", tarnish, gi["Oxide Film (nm)"], -400, 850)
     # annealing stain: blue-grey on the neck fading through brown into the body
     a_band = g.attr("anneal", x=-1200, y=1150)
     anneal = g.math("MULTIPLY", g.math("MULTIPLY", a_band, anneal_amt, -1000, 1150), gi["Annealing"], -850, 1150)
     anneal = g.math("MULTIPLY", anneal, g.map(lo_b, 0.2, 0.8, 0.8, 1.2, x=-1000, y=1350), -700, 1150, clamp=True)
     a_colour = g.mix(g.map(a_band, 0.3, 1.0, smooth=True, x=-700, y=1300), ANNEAL_FRINGE, ANNEAL_CORE, -550, 1300)
-    colour = g.mix(g.math("MULTIPLY", anneal, 0.8, -550, 1150), colour, a_colour, -200, 950)
+    # heat tint (gf_iris): the oxide's temper colours instead of a stain, straw and gold low on
+    # the shoulder through bronze and purple to blue on the neck, where it got hottest. Painted
+    # from a ramp rather than thin-film interference, which EEVEE doesn't draw.
+    iris = g.attr("gf_iris", "OBJECT", x=-1200, y=1450)
+    stain = g.madd(iris, -0.7, 1.0, -700, 1450)
+    colour = g.mix(g.math("MULTIPLY", g.math("MULTIPLY", anneal, 0.8, -550, 1150), stain, -400, 1150), colour, a_colour, -200, 950)
+    heat = g.node("ShaderNodeValToRGB", -600, 1650)
+    g.feed(heat.inputs["Fac"], g.madd(g.math("SUBTRACT", lo_g, 0.5, -900, 1700), 0.25, a_band, -750, 1650, clamp=True))
+    els = heat.color_ramp.elements
+    els[0].position, els[0].color = 0.0, (*METALS_BRASS_BASE, 1.0)
+    els[1].position, els[1].color = 1.0, HEAT_TINT[-1][1]
+    for pos, rgba in HEAT_TINT[:-1]:
+        e = els.new(pos)
+        e.color = rgba
+    colour = g.mix(g.math("MULTIPLY", g.math("MULTIPLY", anneal, iris, -450, 1550), 0.65, -300, 1550), colour, heat.outputs["Color"], -100, 1100)  # faint: the brass still shows
     rough = g.madd(anneal, 0.08, rough, 600, 0, clamp=True)
     grime = g.node("ShaderNodeVectorMath", -400, 1450, operation="SCALE")
     g.feed(grime.inputs[0], gi["Tarnish Color"])
@@ -310,6 +365,20 @@ def metal_group() -> bpy.types.ShaderNodeTree:
     m_height = g.madd(dimple, -0.6, m_height, 300, -600)
     m_height = g.madd(scratch, -0.8, m_height, 350, -700)
     m_normal = g.node("ShaderNodeBump", 450, -450, inputs={"Strength": 0.2, "Distance": 0.00001, "Height": m_height}).outputs["Normal"]
+
+    # ---- coat: thin polymer or lacquer over the metal; uneven, orange-peeled, worn through
+    coat_w = g.math("MULTIPLY", gi["Coat"], unscratched, 600, 800)
+    c_rough = g.madd(fine, 0.05, gi["Coat Roughness"], 450, 1000)
+    c_rough = g.madd(specks, 0.2, c_rough, 550, 1000)
+    c_rough = g.madd(age, 0.12, c_rough, 650, 1000)
+    c_rough = g.madd(dirt_amt, 0.2, c_rough, 750, 1000, clamp=True)
+    mottle = g.math("MULTIPLY", g.map(hi_r, 0.3, 0.7, 0.92, 1.08, x=300, y=1200), g.map(lo_b, 0.3, 0.7, 0.93, 1.07, x=300, y=1350), 450, 1250)
+    c_tint = g.node("ShaderNodeVectorMath", 600, 1250, operation="SCALE")
+    g.feed(c_tint.inputs[0], gi["Coat Tint"])
+    g.feed(_sock(c_tint.inputs, "Scale"), mottle)
+    c_height = g.madd(specks, 0.6, g.math("MULTIPLY", fine, 0.5, 300, -1100), 450, -1100)
+    c_normal = g.node("ShaderNodeBump", 650, -1100, inputs={"Strength": 0.12, "Distance": 0.00001, "Height": c_height}).outputs["Normal"]
+
     metal = g.bsdf(
         1000,
         400,
@@ -320,6 +389,11 @@ def metal_group() -> bpy.types.ShaderNodeTree:
         Thin_Film_Thickness=film,
         Thin_Film_IOR=2.0,
         Normal=m_normal,
+        Coat_Weight=coat_w,
+        Coat_Roughness=c_rough,
+        Coat_IOR=1.5,
+        Coat_Tint=c_tint.outputs[0],
+        Coat_Normal=c_normal,
     )
 
     # ---- dirt layer: soil, patchy, in recesses first, plus a thin film of dust
@@ -377,13 +451,24 @@ def paint_material(key: str, rgb) -> bpy.types.Material:
 
 
 def finish_material(key: str, p: Metal) -> bpy.types.Material:
-    existing = bpy.data.materials.get(key)
-    if existing:
-        return existing
-    mat = _new(key)
-    g = _G(mat.node_tree)
-    grp = g.node("ShaderNodeGroup", 0, 0)
-    grp.node_tree = metal_group()
+    """One material per metal. A material from an older version gets this version's values
+    once; after that, edits made to it in Blender are kept."""
+    group = metal_group()
+    mat = bpy.data.materials.get(key)
+    if mat and mat.get("gf_version") == GROUP_VERSION:
+        return mat
+    grp = None
+    if mat and mat.node_tree:
+        grp = next((n for n in mat.node_tree.nodes if n.type == "GROUP" and n.node_tree == group), None)
+    if grp is None:
+        mat = mat or _new(key)
+        mat.node_tree.nodes.clear()
+        g = _G(mat.node_tree)
+        grp = g.node("ShaderNodeGroup", 0, 0)
+        grp.node_tree = group
+        out = g.node("ShaderNodeOutputMaterial", 300, 0)
+        g.feed(out.inputs["Surface"], grp.outputs["Shader"])
+    mat["gf_version"] = GROUP_VERSION
     values = {
         "Base Color": (*p.base, 1.0),
         "Edge Tint": (*p.edge, 1.0),
@@ -397,11 +482,29 @@ def finish_material(key: str, p: Metal) -> bpy.types.Material:
         "Specks": p.specks,
         "Micro Dents": p.dimples,
         "Annealing": 1.0 if p.anneal else 0.0,
+        "Coat": p.coat,
+        "Coat Roughness": p.coat_roughness,
+        "Coat Tint": (*p.coat_tint, 1.0),
+        "Age Response": p.age_response,
     }
     for name, value in values.items():
         grp.inputs[name].default_value = value
+    tint = p.coat_tint if p.coat else (1.0, 1.0, 1.0)
+    mat.diffuse_color = (*(b * t for b, t in zip(p.base, tint)), 1.0)  # solid-mode viewport colour
+    return mat
+
+
+def label_material() -> bpy.types.Material:
+    """Black, matte text for the cartridge labels."""
+    mat = bpy.data.materials.get("label")
+    if mat:
+        return mat
+    mat = _new("label")
+    g = _G(mat.node_tree)
+    bsdf = g.node("ShaderNodeBsdfPrincipled", 0, 0, inputs={"Base Color": (0.0, 0.0, 0.0, 1.0), "Roughness": 0.9})
     out = g.node("ShaderNodeOutputMaterial", 300, 0)
-    g.feed(out.inputs["Surface"], grp.outputs["Shader"])
+    g.feed(out.inputs["Surface"], bsdf.outputs["BSDF"])
+    mat.diffuse_color = (0.0, 0.0, 0.0, 1.0)
     return mat
 
 
@@ -440,10 +543,10 @@ def studio_world() -> None:
     g.feed(z.inputs[0], tc.outputs["Generated"])
     ramp = g.node("ShaderNodeValToRGB", -400, 0)
     g.feed(ramp.inputs["Fac"], g.map(z.outputs["Z"], -0.3, 1.0, x=-500, y=-200))
-    ramp.color_ramp.elements[0].color = (0.05, 0.05, 0.055, 1)
+    ramp.color_ramp.elements[0].color = (0.42, 0.42, 0.43, 1)  # below the horizon: stands in for the lit floor in reflections
     ramp.color_ramp.elements[1].color = (0.70, 0.71, 0.75, 1)
     mid = ramp.color_ramp.elements.new(0.45)
-    mid.color = (0.22, 0.22, 0.23, 1)
+    mid.color = (0.16, 0.16, 0.17, 1)  # a darker band above the horizon gives metals their contrast
     bg = g.node("ShaderNodeBackground", 0, 0, inputs={"Strength": 0.35})
     g.feed(bg.inputs["Color"], ramp.outputs["Color"])
     out = g.node("ShaderNodeOutputWorld", 250, 0)

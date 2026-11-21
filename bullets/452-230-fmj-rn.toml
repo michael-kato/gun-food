@@ -3,9 +3,9 @@ weight_gr = 230
 dia = 11.481            # SAAMI 45 Auto jacketed bullet max (.4520 in)
 dia_tol = 0.076
 length = 17.30
-nose_length = 9.20
-tip = "round"
-tip_dia = 4.00
+nose_length = 9.00
+tip = "elliptic"        # round nose: a full curve to a blunt tip
+nose_power = 2.1
 exposed_base = 0.75
 
 [sources]

@@ -31,7 +31,7 @@ oal_min = 30.23         # 1.190 in
 oal_max = 32.39         # 1.275 in
 crimp = "taper"
 crimp_amount = 0.06
-crimp_length = 2.8
+crimp_length = 4.5
 approx = ["oal", "crimp_amount"]
 
 [headstamp]

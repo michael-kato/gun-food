@@ -17,6 +17,13 @@
 #   from `years`), {code} (one of `codes`). Symbols: nato (circled cross), ring, dot.
 # dots: how many extra dots (lot / month marks) go in free spots.
 # primer_crimp: none, ring (a staked ring around the pocket) or stakes (three stab marks).
+# age: tarnish range. New ammo gets at least the "new" condition's factory tarnish anyway,
+#   unless the maker is `pristine = true`: showroom-clean cases and bright bullets (keep one
+#   pristine maker per cartridge). Fired brass ages the same for every maker.
+# jacket: bullet jacket metal, e.g. gilding-metal (drawn FMJ), brass (brass-jacketed, as
+#   bright as the case), copper (plated: duller, tarnishes sooner).
+# anneal_colour: { plain = w, rainbow = w }. Plain is the usual brown to blue-grey stain;
+#   rainbow is heat tint, an oxide film thin enough to show faint interference colours.
 # style: letters' stroke `weight` (fraction of letter height added to each side), `width`
 #   (horizontal scale), `size` (scale on the default letter height), `depth` (scale).
 
@@ -53,7 +60,8 @@ weight = 2
 marks = [{ text = "GUN FOOD", at = 12 }, { text = "{caliber}", at = 6 }]
 case = { brass = 1 }
 primer = { nickel = 1 }
-age = [0.0, 0.3]
+age = [0.0, 0.0]
+pristine = true
 style = { weight = 0.05, size = 0.95 }
 
 [[maker]]
@@ -64,9 +72,21 @@ weight = 2
 marks = [{ text = "K V A", at = 12 }, { text = "{caliber}", at = 6 }]
 case = { brass = 6, nickel = 2, aluminum = 1 }
 primer = { nickel = 3, brass = 1 }
-jacket = { gilding-metal = 2, brass = 1 }
+jacket = { gilding-metal = 2, copper = 1 }
 age = [0.0, 0.5]
 style = { width = 0.85, weight = 0.02 }
+
+[[maker]]
+key = "brx"
+name = "BRX (placeholder, brass-jacketed pistol, as some European and Brazilian makers load)"
+classes = ["pistol"]
+weight = 2
+marks = [{ text = "BRX", at = 12 }, { text = "{caliber}", at = 6 }]
+case = { brass = 4, nickel = 1 }
+primer = { brass = 1, nickel = 1 }
+jacket = { brass = 1 }
+age = [0.0, 0.4]
+style = { weight = 0.03, width = 1.05 }
 
 [[maker]]
 key = "lc"
@@ -78,6 +98,7 @@ case = { brass = 1 }
 primer = { brass = 2, nickel = 1 }
 sealant = { none = 3, red = 1 }
 anneal = [0.3, 0.8]
+anneal_colour = { plain = 2, rainbow = 1 }
 age = [0.1, 0.6]
 
 [[maker]]
@@ -93,6 +114,7 @@ sealant = { purple = 3, red = 1 }
 smear = [0.0, 0.15]
 primer_crimp = "ring"
 anneal = [0.6, 1.0]
+anneal_colour = { plain = 3, rainbow = 1 }
 age = [0.15, 0.75]
 tip = { green = 3, lightgreen = 1, none = 3 }
 
@@ -109,6 +131,7 @@ sealant = { red = 2, purple = 1 }
 smear = [0.0, 0.15]
 primer_crimp = "ring"
 anneal = [0.6, 1.0]
+anneal_colour = { plain = 3, rainbow = 1 }
 age = [0.2, 0.8]
 tip = { none = 6, red = 1 }
 
@@ -124,6 +147,7 @@ sealant = { magenta = 2, red = 1 }
 smear = [0.0, 0.3]
 primer_crimp = "ring"
 anneal = [0.4, 0.9]
+anneal_colour = { plain = 1, rainbow = 1 }
 age = [0.1, 0.6]
 tip = { green = 1, none = 2 }
 style = { weight = 0.04, width = 1.1 }
@@ -165,6 +189,18 @@ marks = [{ text = "M", at = 0 }]
 case = { brass = 3, nickel = 1 }
 jacket = { copper = 3, lead = 1 }
 age = [0.0, 0.4]
+
+[[maker]]
+key = "rim-gf"
+name = "GF (Gun Food house brand, rimfire)"
+classes = ["rimfire"]
+weight = 1
+marks = [{ text = "GF", at = 0 }]
+case = { brass = 1 }
+jacket = { copper = 1 }
+age = [0.0, 0.0]
+pristine = true
+style = { size = 0.72 }
 
 [[maker]]
 key = "rim-g"

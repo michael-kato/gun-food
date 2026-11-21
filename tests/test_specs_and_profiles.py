@@ -90,6 +90,33 @@ def test_round_tips_are_round():
         assert all(p[0] < rt for p in apex), f"{b.key}: tip is not rounded off"
 
 
+def test_elliptic_noses_close_gradually():
+    noses = [b for b in specs.load_bullets().values() if b.tip == "elliptic"]
+    assert {"355-115-fmj-rn", "452-230-fmj-rn"} <= {b.key for b in noses}
+    for b in noses:
+        pts = profiles.nose_elliptic(b.dia / 2, 0.0, b.nose_length, b.nose_power, 64)
+        rs = [b.dia / 2] + [p[0] for p in pts]
+        assert all(a >= c for a, c in zip(rs, rs[1:])), f"{b.key}: nose must narrow steadily"
+        assert pts[-1] == (0.0, b.nose_length), b.key
+        # blunt: halfway up the nose it's still most of the way out, and near the tip it's round
+        half = min(pts, key=lambda p: abs(p[1] - b.nose_length / 2))
+        assert half[0] > 0.8 * b.dia / 2, (b.key, half)
+        top = [p for p in pts if p[1] > b.nose_length - 0.25]
+        assert max(p[0] for p in top) > 0.8, f"{b.key}: tip comes to a point"
+
+
+def test_dings_are_small_and_sharp():
+    cart = CARTS[0]
+    ding = variation.Dent(z=10.0, theta=0.0, radius=0.8, depth=0.04, sharp=True)
+    dent = variation.Dent(z=10.0, theta=0.0, radius=0.8, depth=0.04)
+    r = cart.case.base_dia / 2
+    off = lambda d, dz: variation._dent_offset([d], r, 10.0 + dz, 0.0)  # noqa: E731
+    assert _close(off(ding, 0.0), -0.04) and _close(off(dent, 0.0), -0.04)
+    assert abs(off(ding, 0.4)) < abs(off(dent, 0.4)), "a ding is narrower at the bottom than a dent"
+    counts = [sum(d.sharp for d in variation.realize(cart, s, "case").case_dents) for s in range(200)]
+    assert 0.4 < sum(counts) / len(counts) < 1.1, "about one ding per new case or two"
+
+
 def test_copies_stay_inside_tolerance():
     for cart in CARTS:
         k = cart.case
@@ -194,6 +221,27 @@ def test_makers():
     assert ("symbol", "nato", 3) in mil.marks and mil.primer_crimp == "ring" and mil.sealant != "none"
 
 
+def test_finishes():
+    makers = specs.default_makers()
+    for cart in CARTS:
+        table = makers.for_cartridge(cart)
+        pristine = [k for k in table if makers.makers[k].pristine]
+        assert len(pristine) == 1, (cart.key, "one showroom-clean maker per cartridge", pristine)
+        clean = variation.realize(cart, 7, "loaded", maker=pristine[0])
+        assert clean.age == 0.0 and clean.bullet_age == 0.0, (cart.key, "pristine stays clean")
+        assert variation.realize(cart, 7, "fired", maker=pristine[0]).age >= 0.65, (cart.key, "fired brass ages regardless")
+        for i in range(40):
+            cp = variation.realize(cart, variation.copy_seed(5, cart.key, i), "loaded")
+            assert 0.0 < cp.micro <= 1.0, (cart.key, cp.micro)
+            if not cp.lot.pristine:
+                assert cp.age >= 0.15, (cart.key, "factory-new ammo carries some tarnish")
+                lo, hi = variation.JACKET_AGE.get(cp.bullet.jacket, (0.05, 0.4))
+                assert lo <= cp.bullet_age <= min(1.0, hi + 0.4 * cp.lot.age) + 1e-9, (cart.key, cp.bullet.jacket, cp.bullet_age)
+        if cart.cls == "pistol":
+            jackets = {variation.realize(cart, s, "loaded").bullet.jacket for s in range(400)}
+            assert {"gilding-metal", "brass", "copper"} <= jackets, (cart.key, jackets)
+
+
 def test_bad_makers_are_rejected():
     good = specs.MAKERS_PATH.read_text(encoding="utf-8")
     for old, new, msg in (
@@ -201,6 +249,7 @@ def test_bad_makers_are_rejected():
         ('{ text = "CMX", at = 12 }', '{ text = "{maker}", at = 12 }', "placeholder"),
         ('weights = { 223 = 3, 308 = 2 }', 'weights = { 233 = 3 }', "unknown cartridges"),
         ('symbol = "nato"', 'symbol = "star"', "unknown symbol"),
+        ('anneal_colour = { plain = 2, rainbow = 1 }', 'anneal_colour = { plain = 2, neon = 1 }', "anneal_colour"),
     ):
         assert old in good, old
         with tempfile.TemporaryDirectory() as d:

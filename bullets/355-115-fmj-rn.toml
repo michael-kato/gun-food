@@ -3,9 +3,9 @@ weight_gr = 115
 dia = 9.030             # SAAMI 9mm Luger bullet max (.3555 in)
 dia_tol = 0.076
 length = 14.50
-nose_length = 7.40
-tip = "round"
-tip_dia = 3.20
+nose_length = 8.60
+tip = "elliptic"        # round nose: a full curve to a blunt tip
+nose_power = 1.9
 exposed_base = 0.75
 
 [sources]

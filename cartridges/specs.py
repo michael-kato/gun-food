@@ -133,8 +133,10 @@ class BulletSpec:
     dia: float  # maximum diameter
     length: float
     nose_length: float  # bearing surface to tip, along the axis
-    tip: str = "round"  # round: jacket folded into a rounded tip; flat: flat meplat (flat point)
-    tip_dia: float = 1.0  # round: diameter of the rounded tip; flat: meplat diameter
+    tip: str = "round"  # round: tangent ogive into a small rounded tip (spitzer); flat: flat meplat
+    # (flat point); elliptic: pistol round nose, a full curve that closes gradually to a blunt tip
+    tip_dia: float = 1.0  # round: diameter of the rounded tip; flat: meplat diameter; elliptic: unused
+    nose_power: float = 2.0  # elliptic: 2 is an ellipse; higher is fuller and blunter, lower more pointed
     weight_gr: float | None = None
     construction: str = "FMJ"
     boattail_length: float = 0.0
@@ -237,8 +239,10 @@ def load_bullet(path: Path) -> BulletSpec:
     b.approx = approx
     b.path = path
     w = b.key
-    if b.tip not in ("round", "flat"):
-        raise SpecError(f"{w}: tip must be 'round' or 'flat'")
+    if b.tip not in ("round", "flat", "elliptic"):
+        raise SpecError(f"{w}: tip must be 'round', 'flat' or 'elliptic'")
+    if b.tip == "elliptic" and not 1.2 <= b.nose_power <= 4.0:
+        raise SpecError(f"{w}: nose_power must be between 1.2 (pointed) and 4 (very blunt)")
     for metal in (b.jacket, b.core):
         if metal not in METALS:
             raise SpecError(f"{w}: unknown metal {metal!r}; use one of {METALS}")
@@ -379,6 +383,7 @@ def load(path: Path, bullets: dict[str, BulletSpec] | None = None) -> Cartridge:
 
 SYMBOLS = ("nato", "ring", "dot")
 PRIMER_CRIMPS = ("none", "ring", "stakes")
+ANNEAL_COLOURS = ("plain", "rainbow")
 PLACEHOLDERS = {"caliber": "C", "military": "M", "yy": "00", "code": "0"}
 
 
@@ -416,7 +421,9 @@ class Maker:
     years: tuple[int, int] = (1990, 2026)
     codes: list[str] = field(default_factory=list)
     anneal: tuple[float, float] = (0.05, 0.35)
+    anneal_colour: dict[str, float] = field(default_factory=lambda: {"plain": 1.0})  # plain or rainbow (heat tint)
     age: tuple[float, float] = (0.0, 0.4)
+    pristine: bool = False  # showroom-clean when new: no factory tarnish, bright bullets
     jacket: dict[str, float] = field(default_factory=dict)  # empty: the bullet's own
     tip: dict[str, float] = field(default_factory=lambda: {"none": 1.0})
     style: Style = field(default_factory=Style)
@@ -497,6 +504,11 @@ def load_makers(path: Path = MAKERS_PATH, cartridges: set[str] | None = None) ->
         for t in mk.tip:
             if t != "none" and t not in paints:
                 raise SpecError(f"{w}: tip paint {t!r} isn't in [paints]")
+        for a in mk.anneal_colour:
+            if a not in ANNEAL_COLOURS:
+                raise SpecError(f"{w}: anneal_colour {a!r}; use {ANNEAL_COLOURS}")
+        if not isinstance(mk.pristine, bool):
+            raise SpecError(f"{w}: pristine must be true or false")
         if mk.primer_crimp not in PRIMER_CRIMPS:
             raise SpecError(f"{w}: primer_crimp must be one of {PRIMER_CRIMPS}")
         if "{code}" in "".join(m.text for m in marks) and not mk.codes:

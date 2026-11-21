@@ -3,9 +3,9 @@ weight_gr = 95
 dia = 9.030             # .355 in bullets also fit .380 Auto (SAAMI max .3565 in)
 dia_tol = 0.076
 length = 11.30
-nose_length = 6.30
-tip = "round"
-tip_dia = 3.00
+nose_length = 7.00
+tip = "elliptic"        # round nose: a full curve to a blunt tip
+nose_power = 1.9
 exposed_base = 0.75
 
 [sources]

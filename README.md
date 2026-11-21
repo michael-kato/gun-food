@@ -113,19 +113,30 @@ specs/*.toml, bullets/*.toml ──▶ specs.py      load, fill defaults, valida
   follows a typical factory length with a small spread, clamped to SAAMI's min/max.
 - **Bullets** live in `bullets/` and are shared between cartridges: the .308 Winchester and
   .300 Blackout both take .308" bullets. Noses are tangent ogives with a rounded tip
-  (folded FMJ jacket) or a flat meplat (flat point); optional boat tail, cannelure, open
+  (folded FMJ jacket), a flat meplat (flat point) or, for pistol round noses, an elliptic
+  nose that closes gradually to a blunt tip (`tip = "elliptic"`, `nose_power` sets how full);
+  optional boat tail, cannelure, open
   lead base and heel (.22 LR).
 - **Rims and extractor grooves** follow the SAAMI and C.I.P. drawings per cartridge: the
   rim's outer face, a 35° bevel inside the rim thickness (its length is the drawing's rim
   thickness minus rim land), the rim's flat front face, the groove bottom and a ramp up to
   the body at the cartridge's angle (25° on .223, 36° on .308, 48° on 7.62×39). The
   head-side edge is only broken (0.15 mm); the standards don't chamfer it.
-- **Crimps.** Loaded pistol rounds get a taper crimp; rifle rounds are roll-crimped into the
+- **Crimps.** Loaded pistol rounds get a taper crimp: a few hundredths of a millimetre,
+  closing gradually over the top 3.5 to 4.5 mm like a crimp die's long taper (the case
+  body itself tapers all the way from head to mouth); rifle rounds are roll-crimped into the
   bullet's cannelure, which sets their seating depth; the .22 LR is crimped onto its heel.
   Empty cases stay uncrimped.
 - **Handling damage** (factory new, bulk packed): a few shallow dents, slight out-of-round
   toward the mouth, the odd dinged case mouth, bullet runout, softened edges, a light film
-  of dust.
+  of dust, and some factory toning: uneven tarnish and small dark water spots. One maker per
+  cartridge is `pristine` (the Gun Food house brand): showroom-clean cases and bright bullets.
+- **Micro relief:** every case and bullet gets a few microns of smooth, inward waviness
+  (more within a millimetre of the mouth, rim and bullet tip and base, more on soft plated
+  and lead bullets, more once fired), so reflections wobble slightly instead of looking
+  machined, plus the odd small, sharp ding (about one in every new case or two, a few on
+  fired brass). It only goes inward, so measured diameters stay in their bands. Hairline
+  scratches are in the shader: the mesh is too coarse to carry them.
 - **Fired brass** (`fired` condition, modelled on range pickups): body and neck expanded
   toward the chamber, crimp gone, shoulder pushed slightly forward, a firing-pin crater in
   the primer (a crushed rim on rimfire), an extractor nick, mouths dented by the deflector
@@ -137,7 +148,8 @@ specs/*.toml, bullets/*.toml ──▶ specs.py      load, fill defaults, valida
   over steel), primer finish, primer sealant (purple, red, magenta, blue, green; a ring at
   the cup's edge, sometimes run over the face), a staked primer crimp ring or three stab
   marks, the annealing stain on rifle necks, the age range and, for loaded rounds, the
-  jacket (some pistol bullets are brass-jacketed, some .22s bare lead) and tip paint.
+  jacket and tip paint. Pistol bullets come as drawn gilding-metal FMJ, brass-jacketed
+  (as shiny as the case) or copper-plated; .22s plated or bare lead.
   Military 5.56 and 7.62 NATO lots carry `LC`, a two-digit year, the NATO circled cross and
   lot dots; Eastern-bloc 7.62×39 carries an arsenal code and year. See SPECS.md for the
   full table.
@@ -150,9 +162,17 @@ specs/*.toml, bullets/*.toml ──▶ specs.py      load, fill defaults, valida
   are raised.
 - **Materials** are all instances of one shared node group, **`GF Metal`**: each finish
   (brass, gilding metal, copper, lead, nickel, steel, polymer-coated and lacquered steel,
-  aluminium, tip paints) is a material holding just that group with its own inputs (reflectance, F82 edge tint, roughness, tarnish, oxide
-  film, drawing marks, specks, micro-dents, annealing). Edit the group once and every metal
-  follows; every copy of a part shares its metal's material.
+  aluminium, tip paints) is a material holding just that group with its own inputs
+  (reflectance, F82 edge tint, roughness, tarnish, oxide film, drawing marks, specks,
+  micro-dents, annealing, coat, age response). Edit the group once and every metal
+  follows; every copy of a part shares its metal's material. Files built by an older
+  version get the new group and values the first time the add-on touches them.
+- **Coated steel:** steel cases are phosphated steel under a thin tinted clear coat, a dull
+  grey polymer or a glossier olive lacquer. The steel's sheen shows through; the coat has
+  its own orange-peel and mottling, and scratches cut through it to bright steel.
+- **Finishes:** bright nickel plating is very shiny but satin, and barely tarnishes
+  (`Age Response` 0.35). Bullets tarnish by jacket: brass jackets stay bright, gilding metal runs from
+  bright to dull, plated copper is matte and soft from the start.
 - **Layered, not blended.** Inside the group, metal, soil and soot are three complete BSDFs
   mixed as shader closures, like Unreal Substrate slabs: the masks only set coverage, so
   mask edges never turn into half-metallic brass with a pale outline. The soil has its own
@@ -160,15 +180,21 @@ specs/*.toml, bullets/*.toml ──▶ specs.py      load, fill defaults, valida
 - **Per-copy drivers** are baked into vertex attributes (`cavity` for recesses instead of
   costly ambient occlusion, `interior`, `zn` height along the case, `anneal` band, `rn`
   primer radius) or set on the object: the object colour (R dirt, G soot inside, B soot
-  outside, A annealing) and the properties `gf_age` (tarnish), `gf_wear` (scratches) and,
+  outside, A annealing) and the properties `gf_age` (tarnish; bullets carry their own),
+  `gf_wear` (scratches) and,
   on primers, `gf_seal` (sealant colour) and `gf_smear`. EEVEE reads these as uniforms
   (at most 8 per material, so they're kept few). Change them on an object to make it
   cleaner, older or filthier.
-- **Age and wear.** Tarnish spreads from blotches into streaks along the case and darkens
-  with age; scratches run along the case and show bright through tarnish and dirt; the
-  annealing stain fades from blue-grey on the neck through brown into the body.
+- **Age and wear.** Water spots come first, then tarnish spreads from blotches into
+  streaks along the case and darkens with age; scratches run along the case and show bright
+  through tarnish and dirt; the annealing stain fades from blue-grey on the neck through
+  brown into the body. Some military lots instead show heat tint (`anneal_colour = rainbow`
+  in `makers.toml`, `gf_iris` on the case): faint temper colours, straw and gold through
+  bronze and purple up to a blue-grey neck.
 - **EEVEE setup:** screen-space ray tracing with a 2 mm trace thickness (the 0.2 m default
-  smears copper beside millimetre-sized parts), shadows, no fast GI. Detail shots use a long
+  smears copper beside millimetre-sized parts), shadows, no fast GI. The world's lower half
+  stands in for the lit floor in reflections, so mirror-bright nickel doesn't go black. The
+  ground sits 0.1 mm below the parts so heads and labels don't z-fight with it. Detail shots use a long
   lens instead of an orthographic camera, which also breaks screen-space reflections.
 
 ## Adding or changing a cartridge

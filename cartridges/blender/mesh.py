@@ -17,6 +17,9 @@ CASE_SEGMENTS = 64
 BULLET_SEGMENTS = 48
 PRIMER_SEGMENTS = 32
 STAMP_DEPTH = 0.16  # mm, how deep headstamp letter cores are pressed in
+MICRO_AMP = 0.008  # mm, micro relief on smooth surfaces (scaled per copy, see variation.Copy.micro)
+MICRO_EDGE = 3.0  # times as much right at an edge (mouth, rim, bullet tip and base)
+MICRO_FALLOFF = 0.8  # mm, how fast the edge boost fades
 
 
 def lathe(name: str, profile, segments: int, offset=None) -> bpy.types.Mesh:
@@ -63,6 +66,43 @@ def lathe(name: str, profile, segments: int, offset=None) -> bpy.types.Mesh:
     me.update()
     finish_shading(me)
     return me
+
+
+def micro_relief(me: bpy.types.Mesh, amount: float, seed: int, edges=(), waves: int = 16) -> None:
+    """Press a few microns of smooth waviness into a lathed part, so reflections wobble a little
+    instead of looking machined-perfect. Stronger within ~1 mm of the heights in ``edges``
+    (mm), where real parts take their knocks.
+
+    The relief only ever goes inward (radially), so measured diameters stay inside their
+    tolerance bands; inner and outer walls move together, so wall thickness holds. Wavelengths
+    stay above ~1.5 mm, which the lathe's vertex spacing can carry without aliasing.
+    """
+    if amount <= 0:
+        return
+    n = len(me.vertices)
+    co = np.empty(n * 3)
+    me.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3) / MM
+    r = np.hypot(co[:, 0], co[:, 1])
+    th = np.arctan2(co[:, 1], co[:, 0])
+    z = co[:, 2]
+    rng = np.random.default_rng(seed)
+    m = rng.integers(2, 18, waves) * rng.choice((-1, 1), waves)  # whole waves around the part
+    kz = 2 * np.pi / rng.uniform(1.5, 6.0, waves) * rng.choice((-1, 1), waves)
+    ph = rng.uniform(0, 2 * np.pi, waves)
+    a = rng.uniform(0.4, 1.0, waves)
+    h = np.sin(np.outer(th, m) + np.outer(z, kz) + ph) @ a / np.sqrt((a * a).sum() / 2)
+    h = 0.5 + 0.5 * np.tanh(0.8 * h)  # 0-1, pressed in
+    boost = np.zeros(n)
+    for e in edges:
+        boost = np.maximum(boost, np.exp(-np.abs(z - e) / MICRO_FALLOFF))
+    off = -MICRO_AMP * amount * (1 + (MICRO_EDGE - 1) * boost) * h
+    off *= np.clip(r / 0.6, 0.0, 1.0)  # fade out toward the axis (bullet tips, head centre)
+    scale = np.where(r > 1e-6, (r + off) / np.maximum(r, 1e-6), 1.0)
+    co[:, 0] *= scale
+    co[:, 1] *= scale
+    me.vertices.foreach_set("co", (co * MM).ravel())
+    me.update()
 
 
 def finish_shading(me: bpy.types.Mesh, angle: float = 40.0) -> None:

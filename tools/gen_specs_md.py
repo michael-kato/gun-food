@@ -39,6 +39,7 @@ BULLET_ROWS = [
     ("length", "Length"),
     ("nose_length", "Nose (ogive) length"),
     ("tip_dia", "Tip diameter"),
+    ("nose_power", "Nose fullness (elliptic)"),
     ("boattail_length", "Boat-tail length"),
     ("boattail_angle", "Boat-tail half-angle (°)"),
     ("cannelure_z", "Cannelure, from base"),
@@ -89,8 +90,8 @@ def _makers_section(carts) -> list[str]:
         "age and, on loaded rounds, bullet jacket and tip paint. Commercial marks are made up; `LC`",
         "is the US Army's Lake City plant; the Eastern-bloc numbers are arsenal codes.",
         "",
-        "| Maker | Headstamp | Case | Primer | Sealant | Primer crimp | Tip | Share per cartridge |",
-        "|---|---|---|---|---|---|---|---|",
+        "| Maker | Headstamp | Case | Primer | Sealant | Primer crimp | Jacket | Tip | Share per cartridge |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for key, m in makers.makers.items():
         marks = " · ".join(f"`{mk.text}`@{mk.at:g}" if mk.text else f"⟨{mk.symbol}⟩@{mk.at:g}" for mk in m.marks)
@@ -101,13 +102,17 @@ def _makers_section(carts) -> list[str]:
             table = makers.for_cartridge(c)
             if key in table:
                 share.append(f"{c.key} {table[key] / sum(table.values()):.0%}")
+        name = f"{m.name} *(pristine)*" if m.pristine else m.name
         out.append(
-            f"| **{key}**<br>{m.name} | {marks} | {_choices(m.case)} | {_choices(m.primer) if m.primer else 'spec'} | "
-            f"{_choices(m.sealant)} | {m.primer_crimp} | {_choices(m.tip)} | {', '.join(share) or '—'} |"
+            f"| **{key}**<br>{name} | {marks} | {_choices(m.case)} | {_choices(m.primer) if m.primer else 'spec'} | "
+            f"{_choices(m.sealant)} | {m.primer_crimp} | {_choices(m.jacket) if m.jacket else 'spec'} | {_choices(m.tip)} | {', '.join(share) or '—'} |"
         )
     out += [
         "",
         "Tip paint goes on loaded rounds only. Annealing stains show on brass bottleneck cases only.",
+        "New ammo carries some factory tarnish, except from a *pristine* maker (one per cartridge):",
+        "showroom-clean cases and bright bullets. Bullet tarnish follows the jacket: brass stays",
+        "bright, gilding metal varies, plated copper comes dull.",
         "",
     ]
     return out
@@ -176,6 +181,8 @@ def generate() -> str:
         cells = []
         for b in bl:
             v = getattr(b, name)
+            if (name == "tip_dia" and b.tip == "elliptic") or (name == "nose_power" and b.tip != "elliptic"):
+                v = None
             if not v:
                 cells.append("—")
             elif name == "dia":

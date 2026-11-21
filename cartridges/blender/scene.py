@@ -10,7 +10,7 @@ import numpy as np
 from mathutils import Vector
 
 from .. import profiles, variation
-from .materials import ground_material, metal_material, paint_material, studio_world
+from .materials import ground_material, label_material, metal_material, paint_material, studio_world
 from .mesh import (
     BULLET_SEGMENTS,
     CASE_SEGMENTS,
@@ -23,6 +23,7 @@ from .mesh import (
     flatten_head,
     headstamp_tools,
     lathe,
+    micro_relief,
     paint_tip,
     primer_attrs,
 )
@@ -31,6 +32,7 @@ GAP = 10.0  # mm between groups
 CLEARANCE = 0.15  # mm between neighbours inside a group
 GROUP_KINDS = ("loaded", "case", "fired")
 REFINE = 0.6  # mm, longest profile segment (dents need vertices to move)
+GROUND_DROP = 0.1  # mm the ground sits below z=0, so heads and labels don't z-fight with it
 
 
 # ---------------------------------------------------------------- scene setup
@@ -128,6 +130,9 @@ def case_mesh(cart, cp: variation.Copy, name: str) -> tuple[bpy.types.Mesh, str]
     """Unique case mesh for one copy: sampled dimensions, crimp, dents, the maker's headstamp."""
     prof = profiles.refine(profiles.case_profile(cp.case, cp.crimp), REFINE, outside_only=True)
     me = lathe(name, prof, CASE_SEGMENTS, offset=lambda r, z, t: variation.case_offset(cp, r, z, t))
+    c = cp.case
+    edges = (0.0, c.rim_thickness, c.groove_top or c.rim_thickness, c.length)
+    micro_relief(me, cp.micro, variation.copy_seed(cp.seed, "micro-case"), edges)
     me.materials.append(metal_material(cp.case.material))
     tools, region = headstamp_tools(cart, cp, random.Random(cp.headstamp_seed))
     solver = "none"
@@ -147,6 +152,8 @@ def case_mesh(cart, cp: variation.Copy, name: str) -> tuple[bpy.types.Mesh, str]
 def bullet_mesh(cp: variation.Copy, name: str) -> bpy.types.Mesh:
     prof = profiles.refine(profiles.bullet_profile(cp.bullet), REFINE * 1.2, outside_only=True)
     me = lathe(name, prof, BULLET_SEGMENTS, offset=(lambda r, z, t: variation.bullet_offset(cp, r, z, t)) if cp.bullet_dents else None)
+    soft = {"copper": 1.4, "lead": 1.8}.get(cp.bullet.jacket, 1.0)  # plated and bare lead take knocks easily
+    micro_relief(me, cp.micro * soft, variation.copy_seed(cp.seed, "micro-bullet"), (0.0, cp.bullet.length))
     me.materials.append(metal_material(cp.bullet.jacket))
     me.materials.append(metal_material(cp.bullet.core))
     if cp.lot and cp.lot.tip != "none" and cp.tip_length > 0:
@@ -213,6 +220,7 @@ def make_copy(coll, name, cart, cp: variation.Copy, primers: dict | None, locati
         # material drivers in the object colour (see materials.py): dirt, soot in, soot out, anneal
         anneal = cp.lot.anneal if cp.lot else 0.0
         case_ob.color = (cp.dirt, cp.soot_in, cp.soot_out, anneal)
+        case_ob["gf_iris"] = 1.0 if cp.lot and cp.lot.anneal_colour == "rainbow" else 0.0
         if cp.kind == "fired" and not cart.case.rimfire:
             primer = primer_mesh(cart, cp, f"{name}.primer")
         else:
@@ -226,8 +234,11 @@ def make_copy(coll, name, cart, cp: variation.Copy, primers: dict | None, locati
         tilt, az = math.radians(cp.runout[0]), cp.runout[1]
         bl = child(bullet_mesh(cp, f"{name}.bullet"), "bullet", (cp.case.length - cp.seat_depth) * MM, (tilt * math.cos(az), tilt * math.sin(az), 0.0))
         bl.color = (cp.dirt, 0.0, 0.0, 0.0)
+        bl["gf_age"] = cp.bullet_age
     if cp.kind == "bullet":
-        child(bullet_mesh(cp, f"{name}.bullet"), "bullet").color = (cp.dirt, 0.0, 0.0, 0.0)
+        bl = child(bullet_mesh(cp, f"{name}.bullet"), "bullet")
+        bl.color = (cp.dirt, 0.0, 0.0, 0.0)
+        bl["gf_age"] = cp.bullet_age
     stats.setdefault("copies", []).append((cart, cp, root))
     return root
 
@@ -304,7 +315,9 @@ def _label(coll, text, x, y):
     cu.body = text
     cu.size = 0.004
     cu.align_y = "TOP"
+    cu.materials.append(label_material())
     ob = bpy.data.objects.new(f"label {text}", cu)
+    ob.color = (0.0, 0.0, 0.0, 1.0)
     ob.location = (x, y, 0.0)
     coll.objects.link(ob)
 
@@ -318,6 +331,7 @@ def add_studio(width_mm, depth_mm):
     bpy.ops.mesh.primitive_plane_add(size=size)
     ground = bpy.context.active_object
     ground.name = "Ground"
+    ground.location.z = -GROUND_DROP * MM
     ground.data.materials.append(ground_material())
     _move(ground, coll)
 

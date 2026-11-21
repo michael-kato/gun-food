@@ -67,6 +67,7 @@ class Condition:
     dirt: tuple[float, float]  # material: soil / dust coverage, 0-1
     soot_in: tuple[float, float] = (0.0, 0.0)  # material: powder residue inside, 0-1
     soot_out: tuple[float, float] = (0.0, 0.0)  # material: blow-by on the neck outside, 0-1
+    clean_burn: float = 0.0  # chance of a very clean-burning powder: hardly any residue
     fired: bool = False
     body_growth: tuple[float, float] = (0.0, 0.0)  # mm on diameter, case expanded to the chamber
     neck_growth: tuple[float, float] = (0.0, 0.0)  # mm on diameter, neck released the bullet
@@ -81,6 +82,8 @@ class Condition:
     wear: tuple[float, float] = (0.0, 0.35)  # material: scuffs and scratches along the case
     micro: tuple[float, float] = (0.7, 1.0)  # mesh: scale on the micro relief (see mesh.micro_relief)
     dings: float = 0.0  # mean count of small sharp dings per case (bullets get a third as many)
+    rim_nicks: float = 0.0  # mean count of small nicks in the rim's edge (feeding, extraction, tumbling)
+    grime: tuple[float, float] = (0.0, 0.0)  # material: grime at least this (the maker sets the rest)
     ding_radius: tuple[float, float] = (0.55, 0.9)  # mm; the lathe's ~0.5 mm vertex spacing carries no smaller
     ding_depth: tuple[float, float] = (0.015, 0.04)  # mm
 
@@ -99,6 +102,8 @@ CONDITIONS = {
         edge_softening=(1.0, 1.12),
         dirt=(0.06, 0.18),
         dings=0.7,
+        rim_nicks=0.8,
+        wear=(0.1, 0.45),
         age=(0.15, 0.4),  # boxed ammo is never mirror-bright: toning, water spots, handling
     ),
     "fired": Condition(
@@ -118,8 +123,11 @@ CONDITIONS = {
         wear=(0.45, 1.0),
         micro=(1.0, 1.6),
         dings=2.5,
+        rim_nicks=2.0,
+        grime=(0.3, 0.7),
         ding_depth=(0.02, 0.06),
-        soot_in=(0.6, 1.0),
+        soot_in=(0.4, 1.0),
+        clean_burn=0.2,
         soot_out=(0.4, 1.0),
         fired=True,
         body_growth=(0.03, 0.10),
@@ -164,6 +172,7 @@ class Lot:
     anneal_colour: str  # plain (brown to blue-grey stain) or rainbow (heat-tint interference colours)
     age: float  # 0-1, tarnish
     pristine: bool  # showroom-clean when new
+    grime: float  # 0-1, grease film, oxidation mottling, micro-dings
     jacket: str
     tip: str  # "none" or a [paints] name
     tip_rgb: tuple[float, float, float]
@@ -223,6 +232,7 @@ def sample_lot(cart: Cartridge, rng: random.Random, kind: str, makers: specs.Mak
         anneal_colour=_choose(rng, m.anneal_colour),
         age=rng.uniform(*m.age),
         pristine=m.pristine,
+        grime=0.0 if m.pristine else rng.uniform(*m.grime),
         jacket=_choose(rng, m.jacket) if m.jacket else cart.bullet.jacket,
         tip=tip,
         tip_rgb=makers.paints.get(tip, (0.0, 0.0, 0.0)),
@@ -266,6 +276,7 @@ class Copy:
     wear: float = 0.0  # scratches, 0-1
     tip_length: float = 0.0  # mm of painted tip
     bullet_age: float = 0.0  # bullet tarnish, 0-1
+    grime: float = 0.0  # grease film, oxidation, micro-dings, 0-1
     micro: float = 1.0  # scale on the micro relief
 
     def labels(self) -> dict:
@@ -279,6 +290,7 @@ class Copy:
             "case_metal": self.case.material,
             "age": round(self.age, 3),
             "pristine": bool(self.lot and self.lot.pristine),
+            "grime": round(self.grime, 3),
             "wear": round(self.wear, 3),
             "case_length": round(self.case.length, 4),
             "case_rim_dia": round(self.case.rim_dia, 4),
@@ -392,6 +404,15 @@ def _dents(rng, count, z_range, radius, depth):
     return out
 
 
+def _soot_in(rng, cond: Condition) -> float:
+    """Residue inside: one draw, so the copies' other values don't reshuffle. A clean-burning
+    powder (``cond.clean_burn`` of lots) leaves hardly any."""
+    u, (lo, hi) = rng.random(), cond.soot_in
+    if u < cond.clean_burn:
+        return 0.02 + 0.13 * u / cond.clean_burn
+    return lo + (hi - lo) * (u - cond.clean_burn) / max(1e-9, 1 - cond.clean_burn)
+
+
 def _dings(rng, count, z_range, cond: Condition):
     lo, hi = z_range
     if hi <= lo:
@@ -463,11 +484,13 @@ def realize(
     # the odd small, sharp ding, from its own stream so the dimensions above never reshuffle
     drng = random.Random(copy_seed(seed, "dings"))
     case_dents += _dings(drng, _poisson(drng, cond.dings), (body_lo, case.length - 0.5), cond)
+    for _ in range(_poisson(drng, cond.rim_nicks)):  # little nicks in the rim's edge
+        rim_dents.append(Dent(drng.uniform(0.15, case.rim_thickness - 0.05), drng.uniform(0, 2 * math.pi), drng.uniform(0.3, 0.5), drng.uniform(0.02, 0.05), sharp=True))
     if kind in ("loaded", "bullet"):
         lo = seat if kind == "loaded" else 0.5
         bullet_dents += _dings(drng, _poisson(drng, cond.dings / 3), (lo + 0.3, bullet.length - 1.0), cond)
 
-    return Copy(
+    cp = Copy(
         seed=seed,
         kind=kind,
         condition=condition,
@@ -483,16 +506,20 @@ def realize(
         runout=(abs(rng.gauss(0, cond.runout_sd)) if kind == "loaded" else 0.0, rng.uniform(0, 2 * math.pi)),
         primer_strike=strike,
         dirt=rng.uniform(*cond.dirt),
-        soot_in=rng.uniform(*cond.soot_in),
+        soot_in=_soot_in(rng, cond),
         soot_out=rng.uniform(*cond.soot_out) if case.bottleneck or rng.random() < 0.5 else 0.0,
         headstamp_seed=rng.randrange(1 << 30),
         lot=lot,
         age=lot.age if lot.pristine and not cond.fired else max(lot.age, lot_rng.uniform(*cond.age)),
-        wear=lot_rng.uniform(*cond.wear),
+        wear=lot_rng.uniform(*cond.wear) * (0.3 if lot.pristine and not cond.fired else 1.0),
         tip_length=lot_rng.uniform(0.28, 0.38) * bullet.nose_length if lot.tip != "none" else 0.0,
         bullet_age=_bullet_age(lot, bullet.jacket, lot_rng),
         micro=lot_rng.uniform(*cond.micro) * (0.5 if lot.pristine and not cond.fired else 1.0),
+        grime=max(lot.grime, lot_rng.uniform(*cond.grime)),
     )
+    if cond.fired and cp.soot_in < 0.2:  # clean powder: little blow-by either
+        cp.soot_out *= 0.3
+    return cp
 
 
 def _bullet_age(lot: Lot, jacket: str, rng: random.Random) -> float:

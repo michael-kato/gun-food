@@ -135,13 +135,21 @@ specs/*.toml, bullets/*.toml ──▶ specs.py      load, fill defaults, valida
   (more within a millimetre of the mouth, rim and bullet tip and base, more on soft plated
   and lead bullets, more once fired), so reflections wobble slightly instead of looking
   machined, plus the odd small, sharp ding (about one in every new case or two, a few on
-  fired brass). It only goes inward, so measured diameters stay in their bands. Hairline
-  scratches are in the shader: the mesh is too coarse to carry them.
+  fired brass) and little nicks in the rim's edge. It only goes inward, so measured
+  diameters stay in their bands. Hairline scratches and pits are in the shader: the mesh is
+  too coarse to carry them.
+- **Grime and handling** (`grime` per maker, `gf_grime` on each part): a thin film of old
+  grease, darker oxidation patches, thousands of tiny pits and hairline scratches running
+  every which way. Convex edges (rims, mouths, headstamp lips, bullet bases; the baked
+  `edge` attribute) rub bright, shed their dirt and collect the most dings. The `surplus`
+  maker is rough old military 9mm with decades of storage on it; ordinary new ammo carries
+  a little; the pristine house brand none.
 - **Fired brass** (`fired` condition, modelled on range pickups): body and neck expanded
   toward the chamber, crimp gone, shoulder pushed slightly forward, a firing-pin crater in
   the primer (a crushed rim on rimfire), an extractor nick, mouths dented by the deflector
   and boots, tarnish that streaks along the case, scratches, charred interiors (heaviest at
-  the bottom by the flash hole), blow-by soot on the neck and shoulder, and dust in the
+  the bottom and lower walls, thinning toward the mouth; about one lot in five burns clean
+  and leaves hardly any), blow-by soot on the neck and shoulder, and dust in the
   recesses. Add more conditions in `variation.CONDITIONS`.
 - **Makers** (`makers.toml`): each copy draws one, weighted per cartridge. A maker sets the
   headstamp layout, case finish (brass, nickel, aluminium, grey polymer or green lacquer
@@ -173,24 +181,28 @@ specs/*.toml, bullets/*.toml ──▶ specs.py      load, fill defaults, valida
 - **Finishes:** bright nickel plating is very shiny but satin, and barely tarnishes
   (`Age Response` 0.35). Bullets tarnish by jacket: brass jackets stay bright, gilding metal runs from
   bright to dull, plated copper is matte and soft from the start.
-- **Layered, not blended.** Inside the group, metal, soil and soot are three complete BSDFs
+- **Layered, not blended.** Inside the group, metal, sealant and soil are complete BSDFs
   mixed as shader closures, like Unreal Substrate slabs: the masks only set coverage, so
   mask edges never turn into half-metallic brass with a pale outline. The soil has its own
-  grain bump; soot is matte carbon.
+  grain bump. Soot stays inside the metal layer (its colour and edge tint go to carbon
+  black and it turns rough): EEVEE evaluates only a few closures per pixel and dropped a
+  partial soot layer. The group is near the size where the GPU stops compiling it (EEVEE
+  then silently drops parts of it), so it reuses its noise textures' spare outputs.
 - **Per-copy drivers** are baked into vertex attributes (`cavity` for recesses instead of
   costly ambient occlusion, `interior`, `zn` height along the case, `anneal` band, `rn`
   primer radius) or set on the object: the object colour (R dirt, G soot inside, B soot
   outside, A annealing) and the properties `gf_age` (tarnish; bullets carry their own),
-  `gf_wear` (scratches) and,
+  `gf_wear` (scratches), `gf_grime` (grease, oxidation, micro-dings), `gf_iris` (heat
+  tint) and,
   on primers, `gf_seal` (sealant colour) and `gf_smear`. EEVEE reads these as uniforms
   (at most 8 per material, so they're kept few). Change them on an object to make it
   cleaner, older or filthier.
 - **Age and wear.** Water spots come first, then tarnish spreads from blotches into
   streaks along the case and darkens with age; scratches run along the case and show bright
-  through tarnish and dirt; the annealing stain fades from blue-grey on the neck through
-  brown into the body. Some military lots instead show heat tint (`anneal_colour = rainbow`
+  through tarnish and dirt; the annealing stain darkens the neck and shoulder to a deep
+  bronze and fades through darkened gold into the body. Some military lots instead show heat tint (`anneal_colour = rainbow`
   in `makers.toml`, `gf_iris` on the case): faint temper colours, straw and gold through
-  bronze and purple up to a blue-grey neck.
+  bronze and purple up to a dark violet-bronze neck.
 - **EEVEE setup:** screen-space ray tracing with a 2 mm trace thickness (the 0.2 m default
   smears copper beside millimetre-sized parts), shadows, no fast GI. The world's lower half
   stands in for the lit floor in reflections, so mirror-bright nickel doesn't go black. The

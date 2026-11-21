@@ -98,7 +98,7 @@ class GunFoodSettings(bpy.types.PropertyGroup):
     maker: EnumProperty(name="Maker", items=_maker_items, description="Whose headstamp and finish; Any draws one per copy, weighted for the cartridge")
     dirt_scale: FloatProperty(name="Dirt", default=1.0, min=0.0, max=3.0, description="Multiplies the condition's dirt")
     soot_scale: FloatProperty(name="Soot", default=1.0, min=0.0, max=3.0, description="Multiplies a fired case's soot")
-    age_scale: FloatProperty(name="Age", default=1.0, min=0.0, max=3.0, description="Multiplies the tarnish")
+    age_scale: FloatProperty(name="Age", default=1.0, min=0.0, max=3.0, description="Multiplies the tarnish, oxidation and grime")
     wear_scale: FloatProperty(name="Wear", default=1.0, min=0.0, max=3.0, description="Multiplies the scratches")
     use_overrides: BoolProperty(name="Override Spec", default=False, update=_on_toggle_overrides, description="Use the dimensions below instead of the spec's maximums")
     ov_key: StringProperty(options={"HIDDEN"})  # cartridge the override fields were filled from
@@ -189,6 +189,7 @@ class _Maker:
         cp.soot_out = min(1.0, cp.soot_out * s.soot_scale)
         cp.age = min(1.0, cp.age * s.age_scale)
         cp.bullet_age = min(1.0, cp.bullet_age * s.age_scale)
+        cp.grime = min(1.0, cp.grime * s.age_scale)
         cp.wear = min(1.0, cp.wear * s.wear_scale)
         colls = colls or [_collection(self.context, cart.key)]
         root = sc.make_copy(colls[0], f"{cart.key}.{kind}.{seed}", cart, cp, self.primers, location, rot_z, {})

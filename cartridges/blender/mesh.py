@@ -519,7 +519,7 @@ def case_cavity(me, case, region) -> None:
     inside = (z > floor - 0.2) & ((radial < -0.3) | ((nz > 0.5) & (z < case.length - 1.0) & (r < case.base_dia / 2 - 0.3)))
     _store(me, inside.astype(np.float32), "interior")
     _store(me, np.clip(z / case.length, 0.0, 1.0), "zn")
-    if case.bottleneck:
+    if case.bottleneck:  # shoulder and neck up to the mouth, fading out down into the body
         t = np.clip((z - (case.shoulder_start - 6.0)) / 4.5, 0.0, 1.0)
         _store(me, t * t * (3 - 2 * t), "anneal")
     cav = np.zeros(len(r))
@@ -534,6 +534,37 @@ def case_cavity(me, case, region) -> None:
         g = case.groove_dia / 2
         cav = np.where((r > g - 0.3) & (r < g + 0.08) & (z > case.rim_thickness) & (z < case.groove_top), np.maximum(cav, 0.35), cav)
     _store(me, cav)
+
+
+def edge_attr(me, lo: float = 0.08, hi: float = 0.30) -> None:
+    """``edge``: 1 on convex edges (rims, mouths, headstamp lips, bullet bases), 0 on smooth
+    or concave surfaces. Measured per vertex as how far its neighbours drop below its tangent
+    plane, then spread one ring so the wear has some width. Handled edges rub bright, lose
+    their dirt and collect the most dings (see materials.py)."""
+    n = len(me.vertices)
+    co = np.empty(n * 3)
+    me.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+    nor = np.empty(n * 3)
+    me.vertex_normals.foreach_get("vector", nor)
+    nor = nor.reshape(-1, 3)
+    ev = np.empty(len(me.edges) * 2, dtype=np.int64)
+    me.edges.foreach_get("vertices", ev)
+    ev = ev.reshape(-1, 2)
+    d = co[ev[:, 1]] - co[ev[:, 0]]
+    ln = np.linalg.norm(d, axis=1)
+    u = d / np.maximum(ln, 1e-12)[:, None]
+    ok = ln > 1e-12
+    conv = np.zeros(n)
+    np.maximum.at(conv, ev[:, 0], np.where(ok, -(nor[ev[:, 0]] * u).sum(1), 0.0))
+    np.maximum.at(conv, ev[:, 1], np.where(ok, (nor[ev[:, 1]] * u).sum(1), 0.0))
+    e = np.clip((conv - lo) / (hi - lo), 0.0, 1.0)
+    acc, cnt = e.copy(), np.ones(n)
+    np.add.at(acc, ev[:, 0], e[ev[:, 1]])
+    np.add.at(acc, ev[:, 1], e[ev[:, 0]])
+    np.add.at(cnt, ev[:, 0], 1.0)
+    np.add.at(cnt, ev[:, 1], 1.0)
+    _store(me, np.maximum(e, acc / cnt), "edge")
 
 
 def flatten_head(me, depth: float) -> None:

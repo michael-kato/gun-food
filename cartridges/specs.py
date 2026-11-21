@@ -424,6 +424,7 @@ class Maker:
     anneal_colour: dict[str, float] = field(default_factory=lambda: {"plain": 1.0})  # plain or rainbow (heat tint)
     age: tuple[float, float] = (0.0, 0.4)
     pristine: bool = False  # showroom-clean when new: no factory tarnish, bright bullets
+    grime: tuple[float, float] = (0.0, 0.3)  # grease film, oxidation mottling, micro-dings
     jacket: dict[str, float] = field(default_factory=dict)  # empty: the bullet's own
     tip: dict[str, float] = field(default_factory=lambda: {"none": 1.0})
     style: Style = field(default_factory=Style)
@@ -488,7 +489,7 @@ def load_makers(path: Path = MAKERS_PATH, cartridges: set[str] | None = None) ->
         if not marks:
             raise SpecError(f"{w}: needs at least one mark")
         style = Style(**raw.pop("style", {}))
-        for name in ("smear", "dots", "years", "anneal", "age"):
+        for name in ("smear", "dots", "years", "anneal", "age", "grime"):
             if name in raw:
                 raw[name] = tuple(raw[name])
         mk = Maker(marks=marks, style=style, **raw)

@@ -20,6 +20,7 @@ from .mesh import (
     bullet_cavity,
     case_cavity,
     finish_shading,
+    edge_attr,
     flatten_head,
     headstamp_tools,
     lathe,
@@ -145,6 +146,7 @@ def case_mesh(cart, cp: variation.Copy, name: str) -> tuple[bpy.types.Mesh, str]
         finish_shading(me)
         flatten_head(me, region[3] if region else 0.3)
     case_cavity(me, cp.case, region)
+    edge_attr(me)
     me.name = name
     return me, solver
 
@@ -160,6 +162,7 @@ def bullet_mesh(cp: variation.Copy, name: str) -> bpy.types.Mesh:
         me.materials.append(paint_material(cp.lot.tip, cp.lot.tip_rgb))
         paint_tip(me, cp.bullet, cp.tip_length, 2)
     bullet_cavity(me, cp.bullet)
+    edge_attr(me)
     return me
 
 
@@ -172,6 +175,7 @@ def primer_mesh(cart, cp: variation.Copy | None = None, name: str | None = None,
     me = lathe(name or f"{cart.key}.primer.{metal}", profiles.primer_profile(cart.case, strike=strike), PRIMER_SEGMENTS)
     me.materials.append(metal_material(metal))
     primer_attrs(me, cart.case)
+    edge_attr(me)
     return me
 
 
@@ -210,6 +214,7 @@ def make_copy(coll, name, cart, cp: variation.Copy, primers: dict | None, locati
         ob.rotation_euler = rot
         ob["gf_age"] = cp.age  # material drivers, see materials.py
         ob["gf_wear"] = cp.wear
+        ob["gf_grime"] = cp.grime
         coll.objects.link(ob)
         return ob
 

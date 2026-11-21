@@ -101,16 +101,17 @@ is the US Army's Lake City plant; the Eastern-bloc numbers are arsenal codes.
 
 | Maker | Headstamp | Case | Primer | Sealant | Primer crimp | Jacket | Tip | Share per cartridge |
 |---|---|---|---|---|---|---|---|---|
-| **cmx**<br>CMX (placeholder commercial) | `CMX`@12 · `{caliber}`@6 | brass 82%, nickel 18% | nickel 67%, brass 33% | none 75%, blue 12%, green 12% | none | spec | none | 9mm 27%, 223 20%, 45ACP 30%, 40CAL 30%, 380ACP 30%, 762x39 21%, 308 27%, 300blackout 50% |
-| **gunfood**<br>Gun Food house brand *(pristine)* | `GUN FOOD`@12 · `{caliber}`@6 | brass | nickel | none | none | spec | none | 9mm 18%, 223 13%, 45ACP 20%, 40CAL 20%, 380ACP 20%, 762x39 14%, 308 18%, 300blackout 33% |
-| **kva**<br>K V A (placeholder, spaced letters, pistol) | `K V A`@12 · `{caliber}`@6 | brass 67%, nickel 22%, aluminum 11% | nickel 75%, brass 25% | none | none | gilding-metal 67%, copper 33% | none | 9mm 18%, 45ACP 20%, 40CAL 20%, 380ACP 20% |
-| **brx**<br>BRX (placeholder, brass-jacketed pistol, as some European and Brazilian makers load) | `BRX`@12 · `{caliber}`@6 | brass 80%, nickel 20% | brass 50%, nickel 50% | none | none | brass | none | 9mm 18%, 45ACP 20%, 40CAL 20%, 380ACP 20% |
+| **cmx**<br>CMX (placeholder commercial) | `CMX`@12 · `{caliber}`@6 | brass 82%, nickel 18% | nickel 67%, brass 33% | none 75%, blue 12%, green 12% | none | spec | none | 9mm 23%, 223 20%, 45ACP 30%, 40CAL 30%, 380ACP 30%, 762x39 21%, 308 27%, 300blackout 50% |
+| **gunfood**<br>Gun Food house brand *(pristine)* | `GUN FOOD`@12 · `{caliber}`@6 | brass | nickel | none | none | spec | none | 9mm 15%, 223 13%, 45ACP 20%, 40CAL 20%, 380ACP 20%, 762x39 14%, 308 18%, 300blackout 33% |
+| **kva**<br>K V A (placeholder, spaced letters, pistol) | `K V A`@12 · `{caliber}`@6 | brass 67%, nickel 22%, aluminum 11% | nickel 75%, brass 25% | none | none | gilding-metal 67%, copper 33% | none | 9mm 15%, 45ACP 20%, 40CAL 20%, 380ACP 20% |
+| **brx**<br>BRX (placeholder, brass-jacketed pistol, as some European and Brazilian makers load) | `BRX`@12 · `{caliber}`@6 | brass 80%, nickel 20% | brass 50%, nickel 50% | none | none | brass | none | 9mm 15%, 45ACP 20%, 40CAL 20%, 380ACP 20% |
 | **lc**<br>Lake City, commercial | `LC`@12 · `{yy}`@9 · `{caliber}`@5 | brass | brass 67%, nickel 33% | none 75%, red 25% | none | spec | none | 223 20%, 308 18% |
 | **lc-m855**<br>Lake City, military 5.56 NATO | `LC`@12 · `{yy}`@6 · ⟨nato⟩@3 + 0–3 dots | brass | brass | purple 75%, red 25% | ring | spec | green 43%, lightgreen 14%, none 43% | 223 20% |
 | **lc-m80**<br>Lake City, military 7.62 NATO | `LC`@12 · `{yy}`@6 · ⟨nato⟩@3 + 0–2 dots | brass | brass | red 67%, purple 33% | ring | spec | none 86%, red 14% | 308 27% |
 | **zm**<br>ZM, foreign military 5.56 | `ZM`@1 · `{yy}`@6 · `{military}`@10 | brass | brass | magenta 67%, red 33% | ring | spec | green 33%, none 67% | 223 13% |
-| **sever**<br>SEVER (placeholder, steel case) | `SEVER`@12 · `{caliber}`@6 · ⟨ring⟩@3 | steel-polymer 75%, steel-lacquer 25% | brass | red 75%, none 25% | none | spec | none | 9mm 18%, 223 13%, 45ACP 10%, 40CAL 10%, 380ACP 10%, 762x39 43%, 308 9%, 300blackout 17% |
+| **sever**<br>SEVER (placeholder, steel case) | `SEVER`@12 · `{caliber}`@6 · ⟨ring⟩@3 | steel-polymer 75%, steel-lacquer 25% | brass | red 75%, none 25% | none | spec | none | 9mm 15%, 223 13%, 45ACP 10%, 40CAL 10%, 380ACP 10%, 762x39 43%, 308 9%, 300blackout 17% |
 | **arsenal**<br>Eastern-bloc military (factory code and year) | `{code}`@12 · `{yy}`@6 | steel-lacquer 75%, brass 25% | brass | red 67%, purple 33% | stakes | spec | none | 762x39 21% |
+| **surplus**<br>Nordic military surplus 9mm (placeholder marks; rough, greasy, decades in storage) | `M/39`@12 · `{yy}`@6 + 0–1 dots | brass | brass | none | stakes | gilding-metal 67%, brass 33% | none | 9mm 15% |
 | **rim-m**<br>M (placeholder rimfire) | `M`@0 | brass 75%, nickel 25% | spec | none | none | copper 75%, lead 25% | none | 22LR 50% |
 | **rim-gf**<br>GF (Gun Food house brand, rimfire) *(pristine)* | `GF`@0 | brass | spec | none | none | copper | none | 22LR 25% |
 | **rim-g**<br>G (placeholder rimfire) | `G`@0 | brass | spec | none | none | copper 50%, lead 50% | none | 22LR 25% |

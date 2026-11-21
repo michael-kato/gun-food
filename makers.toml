@@ -22,6 +22,8 @@
 #   pristine maker per cartridge). Fired brass ages the same for every maker.
 # jacket: bullet jacket metal, e.g. gilding-metal (drawn FMJ), brass (brass-jacketed, as
 #   bright as the case), copper (plated: duller, tarnishes sooner).
+# grime: [min, max]. A thin film of old grease, darker oxidation patches and thousands of
+#   micro-dings: 0 is clean, 1 is rough old surplus. Fired brass gets at least some.
 # anneal_colour: { plain = w, rainbow = w }. Plain is the usual brown to blue-grey stain;
 #   rainbow is heat tint, an oxide film thin enough to show faint interference colours.
 # style: letters' stroke `weight` (fraction of letter height added to each side), `width`
@@ -96,6 +98,7 @@ marks = [{ text = "LC", at = 12 }, { text = "{yy}", at = 9 }, { text = "{caliber
 years = [2005, 2026]
 case = { brass = 1 }
 primer = { brass = 2, nickel = 1 }
+grime = [0.05, 0.4]
 sealant = { none = 3, red = 1 }
 anneal = [0.3, 0.8]
 anneal_colour = { plain = 2, rainbow = 1 }
@@ -110,6 +113,7 @@ dots = [0, 3]
 years = [1985, 2026]
 case = { brass = 1 }
 primer = { brass = 1 }
+grime = [0.1, 0.5]
 sealant = { purple = 3, red = 1 }
 smear = [0.0, 0.15]
 primer_crimp = "ring"
@@ -127,6 +131,7 @@ dots = [0, 2]
 years = [1975, 2026]
 case = { brass = 1 }
 primer = { brass = 1 }
+grime = [0.1, 0.5]
 sealant = { red = 2, purple = 1 }
 smear = [0.0, 0.15]
 primer_crimp = "ring"
@@ -170,6 +175,7 @@ weights = { 762x39 = 3 }
 marks = [{ text = "{code}", at = 12 }, { text = "{yy}", at = 6 }]
 codes = ["3", "17", "38", "60", "188", "270", "539", "711"]
 years = [1960, 1991]
+grime = [0.4, 0.9]
 case = { steel-lacquer = 3, brass = 1 }
 primer = { brass = 1 }
 sealant = { red = 2, purple = 1 }
@@ -177,6 +183,21 @@ smear = [0.0, 0.3]
 primer_crimp = "stakes"
 age = [0.3, 0.9]
 style = { weight = 0.04, size = 1.1 }
+
+[[maker]]
+key = "surplus"
+name = "Nordic military surplus 9mm (placeholder marks; rough, greasy, decades in storage)"
+weights = { 9mm = 2 }
+marks = [{ text = "M/39", at = 12 }, { text = "{yy}", at = 6 }]
+dots = [0, 1]
+years = [1960, 1990]
+case = { brass = 1 }
+primer = { brass = 1 }
+primer_crimp = "stakes"
+jacket = { gilding-metal = 2, brass = 1 }
+age = [0.55, 0.9]
+grime = [0.65, 1.0]
+style = { weight = 0.04 }
 
 # Rimfire: a single raised letter in the middle of the head.
 

@@ -13,8 +13,8 @@ Inside the group:
   specks and micro-dents, recess grime from the baked ``cavity`` attribute (instead of
   costly ambient occlusion), and an annealing tint on rifle necks (``anneal`` attribute)
 * dirt layer: dielectric soil with its own grainy surface; collects in recesses first
-* soot layer: matte carbon inside fired cases (heaviest at the floor) and blow-by
-  streaks on the neck
+* soot: matte carbon inside fired cases (heaviest at the floor and lower walls, thinning
+  toward the mouth) and blow-by streaks on the neck, folded into the metal layer
 * coat: a thin tinted clear coat over the metal (``Coat``): the polymer or lacquer on
   steel cases. Steel shows through it, it has its own orange-peel and mottling, and
   scratches cut through it to bare steel
@@ -30,8 +30,11 @@ only set coverage, so mask edges never produce half-metallic, pale-looking brass
 
 Per-copy drivers live in the object colour (R dirt, G soot inside, B soot outside,
 A annealing amount) and in object properties: ``gf_age`` (tarnish spreads, streaks and
-darkens), ``gf_wear`` (scratches along the case), and on primers ``gf_seal`` (sealant
-colour, black for none) and ``gf_smear``. Texture space is object space in millimetres,
+darkens), ``gf_wear`` (scratches along the case, hairlines every which way, rubbed edges),
+``gf_grime`` (a thin film of old grease, oxidation mottling, thousands of micro-dings),
+``gf_iris`` (heat-tint annealing), and on primers ``gf_seal`` (sealant colour, black for
+none) and ``gf_smear``. The baked ``edge`` attribute marks convex edges (rims, mouths,
+letter lips), which wear bright and collect the most dings. Texture space is object space in millimetres,
 offset by the object's random value, so every copy gets its own pattern.
 """
 
@@ -43,7 +46,7 @@ from dataclasses import dataclass
 import bpy
 
 GROUP = "GF Metal"
-GROUP_VERSION = 3  # bump when the group changes: files with an older group get it rebuilt
+GROUP_VERSION = 4  # bump when the group changes: files with an older group get it rebuilt
 
 
 @dataclass(frozen=True)
@@ -108,20 +111,21 @@ INPUTS = [
     ("Age Response", "NodeSocketFloat", 1.0),
 ]
 
-ANNEAL_FRINGE = (0.30, 0.17, 0.10, 1.0)  # straw-brown where the heat faded out
-ANNEAL_CORE = (0.22, 0.21, 0.24, 1.0)  # blue-grey on the neck, where it was hottest
+ANNEAL_FRINGE = (0.36, 0.24, 0.10, 1.0)  # darkened gold where the heat faded out
+ANNEAL_CORE = (0.15, 0.095, 0.045, 1.0)  # dark bronze-brown on the neck, where it was hottest
 # heat tint (temper colours of the oxide), from the cool end of the band to the hot neck
 HEAT_TINT = [
     (0.22, (0.86, 0.64, 0.26, 1.0)),  # straw
     (0.42, (0.74, 0.42, 0.17, 1.0)),  # gold to bronze
     (0.60, (0.56, 0.24, 0.24, 1.0)),  # copper-red
-    (0.76, (0.42, 0.22, 0.42, 1.0)),  # purple
-    (1.00, (0.26, 0.32, 0.52, 1.0)),  # blue
+    (0.76, (0.42, 0.22, 0.36, 1.0)),  # purple
+    (1.00, (0.26, 0.18, 0.15, 1.0)),  # dark bronze with a hint of violet
 ]
 METALS_BRASS_BASE = (0.88, 0.70, 0.34)
 SOIL_DARK = (0.025, 0.019, 0.013, 1.0)
 SOIL_LIGHT = (0.085, 0.064, 0.042, 1.0)
 SOOT = (0.014, 0.013, 0.012, 1.0)
+GREASE_TINT = (0.80, 0.70, 0.50, 1.0)  # an old film of manufacturing grease: warm, a little dark
 
 
 def _sock(sockets, key):
@@ -249,15 +253,16 @@ def metal_group() -> bpy.types.ShaderNodeTree:
     anneal_amt = info.outputs["Alpha"]
 
     # ---- shared noise channels
-    _, lo_r, lo_g, lo_b = g.noise_rgb(pmm, w, 0.25, 2.0, -1400, 400)  # tarnish, drift, anneal streaks
-    _, hi_r, hi_g, _ = g.noise_rgb(pmm, w, 3.0, 2.0, -1400, 0)  # fine roughness, specks
+    # Noise nodes are the shader's bulk, and a group too big for the GPU fails to compile
+    # (EEVEE then drops parts of it without a word), so every spare output is reused.
+    lo_f, lo_r, lo_g, lo_b = g.noise_rgb(pmm, w, 0.25, 2.0, -1400, 400)  # oxidation, tarnish, drift, anneal streaks
+    _, hi_r, hi_g, hi_b = g.noise_rgb(pmm, w, 3.0, 2.0, -1400, 0)  # fine roughness, specks, water spots
     stretch = g.node("ShaderNodeVectorMath", -1600, -550, operation="MULTIPLY")
     g.feed(stretch.inputs[0], pmm)
     stretch.inputs[1].default_value = (6.0, 6.0, 0.08)
     lines_fac, _, _, _ = g.noise_rgb(stretch.outputs[0], w, 1.0, 1.0, -1400, -550)  # drawing marks along the axis
-    vor = g.node("ShaderNodeTexVoronoi", -1400, -850, voronoi_dimensions="4D", feature="F1")
-    g.feed(vor.inputs["Vector"], pmm)
-    g.feed(vor.inputs["W"], w)
+    vor = g.node("ShaderNodeTexVoronoi", -1400, -850, voronoi_dimensions="3D", feature="F1")
+    g.feed(vor.inputs["Vector"], g.node("ShaderNodeVectorMath", -1550, -850, operation="ADD", inputs={0: pmm, 1: w}).outputs[0])
     vor.inputs["Scale"].default_value = 0.9
     cell = g.node("ShaderNodeSeparateColor", -1200, -950)
     g.feed(cell.inputs[0], vor.outputs["Color"])
@@ -272,9 +277,12 @@ def metal_group() -> bpy.types.ShaderNodeTree:
     cavity = g.attr("cavity", x=-1000, y=800)
     zn = g.attr("zn", x=-1400, y=1900)  # height along the case, 0 head .. 1 mouth
     interior = g.attr("interior", x=-1200, y=2700)
-    # per-copy object properties (EEVEE allows 8 such uniforms per material; keep it at 5)
+    # per-copy object properties (EEVEE allows 8 such uniforms per material; keep it at 6)
     age = g.math("MULTIPLY", g.attr("gf_age", "OBJECT", x=-1800, y=650), gi["Age Response"], -1600, 650, clamp=True)  # tarnish with age, 0-1
     wear = g.attr("gf_wear", "OBJECT", x=-1600, y=-1250)  # scratches and scuffs, 0-1
+    grime_amt = g.attr("gf_grime", "OBJECT", x=-1800, y=-1650)  # grease film, oxidation, micro-dings, 0-1
+    edge = g.attr("edge", x=-1800, y=-1800)  # convex edges, baked per mesh
+    edge_w = g.math("MULTIPLY", edge, g.madd(g.math("MAXIMUM", wear, grime_amt, -1600, -1850), 0.7, 0.3, -1450, -1850), -1300, -1800, clamp=True)
 
     # ---- age: blotches spread, streaks along the case appear, the tarnish darkens
     t_lo = g.madd(age, -0.30, 0.45, -1200, 650)
@@ -300,13 +308,52 @@ def metal_group() -> bpy.types.ShaderNodeTree:
     sp_lo = g.madd(wear, -0.12, 0.60, -1200, -1350)
     sparse = g.map(sp_fac, sp_lo, g.math("ADD", sp_lo, 0.06, -1100, -1400), x=-1000, y=-1350)
     scratch = g.math("MULTIPLY", g.math("MULTIPLY", sc_line, sparse, -850, -1200), wear, -700, -1200, clamp=True)
+
+    # ---- hairline scratches every which way (boxes, magazines, handling), more on the edges
+    ms_amt = g.madd(grime_amt, 0.6, g.math("MULTIPLY", wear, 0.8, -1200, -2000), -1100, -2000)
+    ms_amt = g.madd(edge_w, 0.6, ms_amt, -1000, -2000, clamp=True)
+    hair = None
+    _, mk_r, mk_g, _ = g.noise_rgb(pmm, g.math("ADD", w, 50.0, -1600, -2050), 1.4, 0.0, -1300, -2050)
+    for i, (rot, mf) in enumerate((((0.0, 1.25, 0.4), mk_r), ((1.1, 0.35, 2.1), mk_g))):
+        y = -2150 - 220 * i
+        vr = g.node("ShaderNodeVectorRotate", -1600, y, rotation_type="EULER_XYZ")
+        g.feed(vr.inputs["Vector"], pmm)
+        vr.inputs["Rotation"].default_value = rot
+        sq = g.node("ShaderNodeVectorMath", -1450, y, operation="MULTIPLY")
+        g.feed(sq.inputs[0], vr.outputs[0])
+        sq.inputs[1].default_value = (0.4, 18.0, 18.0)  # hairlines along the rotated x
+        hf, _, _, _ = g.noise_rgb(sq.outputs[0], g.math("ADD", w, 40.0 + i, -1600, y - 80), 1.0, 0.0, -1300, y)
+        hl = g.map(g.math("ABSOLUTE", g.math("SUBTRACT", hf, 0.5, -1100, y), 0.0, -1000, y), 0.0, 0.009, 1.0, 0.0, x=-900, y=y)
+        m_lo = g.madd(ms_amt, -0.20, 0.63, -1100, y - 100)
+        hm = g.map(mf, m_lo, g.math("ADD", m_lo, 0.04, -1000, y - 140), x=-900, y=y - 100)
+        h = g.math("MULTIPLY", hl, hm, -800, y)
+        hair = h if hair is None else g.math("MAXIMUM", hair, h, -700, y)
+    hair = g.math("MULTIPLY", hair, ms_amt, -600, -2200, clamp=True)
+    scratch = g.math("MAXIMUM", scratch, g.math("MULTIPLY", hair, 0.7, -500, -2200), -450, -1200)
     unscratched = g.math("SUBTRACT", 1.0, scratch, -550, -1200)
 
+    # ---- micro-dings: thousands of tiny pits from tumbling and bulk packing, densest on the
+    # edges; each one catches a little grime
+    mv = g.node("ShaderNodeTexVoronoi", -1400, -2900, voronoi_dimensions="3D", feature="F1")
+    g.feed(mv.inputs["Vector"], g.node("ShaderNodeVectorMath", -1550, -2900, operation="ADD", inputs={0: pmm, 1: g.math("ADD", w, 60.0, -1650, -2950)}).outputs[0])
+    mv.inputs["Scale"].default_value = 4.5
+    mcell = g.node("ShaderNodeSeparateColor", -1200, -3000)
+    g.feed(mcell.inputs[0], mv.outputs["Color"])
+    density = g.madd(wear, 0.10, 0.03, -1200, -3100)
+    density = g.madd(grime_amt, 0.35, density, -1100, -3100)
+    density = g.madd(edge_w, 0.35, density, -1000, -3100, clamp=True)
+    d_lo = g.math("SUBTRACT", 1.0, density, -900, -3100)
+    mpick = g.map(mcell.outputs[0], d_lo, g.math("ADD", d_lo, 0.01, -850, -3150), x=-750, y=-3050)
+    mbowl = g.map(mv.outputs["Distance"], 0.0, 0.32, 1.0, 0.0, x=-750, y=-2900, smooth=True)
+    mding = g.math("MULTIPLY", mbowl, mpick, -600, -2950)
+
     tarnish = g.math("MULTIPLY", g.math("MULTIPLY", g.math("MAXIMUM", blot, streaks, -800, 550), t_amt, -700, 550), unscratched, -600, 550)
+    rubbed = g.madd(edge_w, -0.75, 1.0, -700, 450)  # handled edges are rubbed bright
+    tarnish = g.math("MULTIPLY", tarnish, rubbed, -500, 550)
 
     # ---- factory toning: small dark water spots and stains, more and more of them with age
-    spot_fac, _, _, _ = g.noise_rgb(pmm, g.math("ADD", w, 13.0, -1600, 250), 2.2, 2.0, -1400, 250)
-    spot_lo = g.madd(age, -0.06, 0.715, -1200, 250)
+    spot_fac = hi_b
+    spot_lo = g.madd(grime_amt, -0.04, g.madd(age, -0.06, 0.715, -1300, 250), -1200, 250)
     spots = g.map(spot_fac, spot_lo, g.math("ADD", spot_lo, 0.02, -1100, 200), x=-1000, y=250, smooth=True)
     spots = g.math("MULTIPLY", g.math("MULTIPLY", spots, g.map(age, 0.03, 0.3, x=-1000, y=150), -850, 250), unscratched, -700, 250)
 
@@ -319,9 +366,12 @@ def metal_group() -> bpy.types.ShaderNodeTree:
     rough = g.madd(tarnish, 0.10, rough, 200, 0)
     rough = g.madd(spots, 0.12, rough, 240, 0)
     rough = g.madd(age, 0.10, rough, 275, 0)  # old brass is dull all over
-    rough = g.madd(scratch, 0.12, rough, 300, -100)
+    rough = g.madd(scratch, 0.30, rough, 300, -100)
     rough = g.madd(cavity, 0.25, rough, 350, 0)
     rough = g.madd(dirt_amt, 0.2, rough, 450, 0)  # brass that has lain in the dirt is dull
+    rough = g.madd(grime_amt, 0.05, rough, 475, 0)  # handled, greasy brass is a little hazy
+    rough = g.madd(mding, 0.25, rough, 500, 0)
+    rough = g.madd(edge_w, 0.05, rough, 525, 0)
     rough = g.madd(g.math("SUBTRACT", rnd, 0.5, -400, -250), 0.04, rough, 550, 0, clamp=True)
 
     dark_t = g.node("ShaderNodeVectorMath", -600, 800, operation="SCALE")
@@ -329,19 +379,32 @@ def metal_group() -> bpy.types.ShaderNodeTree:
     _sock(dark_t.inputs, "Scale").default_value = 0.30
     t_colour = g.mix(g.math("MULTIPLY", age, 0.9, -600, 950), gi["Tarnish Color"], dark_t.outputs[0], -450, 850)
     colour = g.mix(g.math("MULTIPLY", tarnish, 0.95, -600, 650), gi["Base Color"], t_colour, -300, 650)
-    colour = g.mix(g.math("MULTIPLY", spots, 0.65, -300, 500), colour, dark_t.outputs[0], -150, 600)
+    colour = g.mix(g.math("MULTIPLY", g.math("MULTIPLY", spots, 0.65, -300, 500), rubbed, -250, 500), colour, dark_t.outputs[0], -150, 600)
+    # oxidation: the brass goes darker in soft, uneven patches (not on rubbed edges)
+    ox_fac = lo_f
+    ox_amt = g.madd(grime_amt, 0.40, g.madd(age, 0.15, 0.10, -900, 100), -800, 100)
+    ox = g.math("MULTIPLY", g.math("MULTIPLY", g.map(ox_fac, 0.35, 0.65, x=-900, y=150), ox_amt, -700, 150), rubbed, -600, 150)
+    ox_dark = g.node("ShaderNodeVectorMath", -400, 250, operation="SCALE")
+    g.feed(ox_dark.inputs[0], colour)
+    _sock(ox_dark.inputs, "Scale").default_value = 0.55
+    colour = g.mix(ox, colour, ox_dark.outputs[0], -250, 300)
+    tone = g.node("ShaderNodeVectorMath", -150, 300, operation="SCALE")  # lots differ a little in tone
+    g.feed(tone.inputs[0], colour)
+    g.feed(_sock(tone.inputs, "Scale"), g.madd(rnd, 0.10, 0.93, -300, 200))
+    colour = tone.outputs[0]
+    colour = g.mix(g.math("MULTIPLY", mding, 0.6, -150, 450), colour, dark_t.outputs[0], -50, 450)
     film = g.math("MULTIPLY", tarnish, gi["Oxide Film (nm)"], -400, 850)
-    # annealing stain: blue-grey on the neck fading through brown into the body
+    # annealing stain: dark bronze on the neck fading through darkened gold into the body
     a_band = g.attr("anneal", x=-1200, y=1150)
     anneal = g.math("MULTIPLY", g.math("MULTIPLY", a_band, anneal_amt, -1000, 1150), gi["Annealing"], -850, 1150)
     anneal = g.math("MULTIPLY", anneal, g.map(lo_b, 0.2, 0.8, 0.8, 1.2, x=-1000, y=1350), -700, 1150, clamp=True)
     a_colour = g.mix(g.map(a_band, 0.3, 1.0, smooth=True, x=-700, y=1300), ANNEAL_FRINGE, ANNEAL_CORE, -550, 1300)
     # heat tint (gf_iris): the oxide's temper colours instead of a stain, straw and gold low on
-    # the shoulder through bronze and purple to blue on the neck, where it got hottest. Painted
+    # the shoulder through bronze and purple to dark violet-bronze on the neck. Painted
     # from a ramp rather than thin-film interference, which EEVEE doesn't draw.
     iris = g.attr("gf_iris", "OBJECT", x=-1200, y=1450)
     stain = g.madd(iris, -0.7, 1.0, -700, 1450)
-    colour = g.mix(g.math("MULTIPLY", g.math("MULTIPLY", anneal, 0.8, -550, 1150), stain, -400, 1150), colour, a_colour, -200, 950)
+    colour = g.mix(g.math("MULTIPLY", g.math("MULTIPLY", anneal, 1.0, -550, 1150), stain, -400, 1150), colour, a_colour, -200, 950)
     heat = g.node("ShaderNodeValToRGB", -600, 1650)
     g.feed(heat.inputs["Fac"], g.madd(g.math("SUBTRACT", lo_g, 0.5, -900, 1700), 0.25, a_band, -750, 1650, clamp=True))
     els = heat.color_ramp.elements
@@ -351,7 +414,7 @@ def metal_group() -> bpy.types.ShaderNodeTree:
         e = els.new(pos)
         e.color = rgba
     colour = g.mix(g.math("MULTIPLY", g.math("MULTIPLY", anneal, iris, -450, 1550), 0.65, -300, 1550), colour, heat.outputs["Color"], -100, 1100)  # faint: the brass still shows
-    rough = g.madd(anneal, 0.08, rough, 600, 0, clamp=True)
+    rough = g.madd(anneal, 0.10, rough, 600, 0, clamp=True)  # the oxide is satin
     grime = g.node("ShaderNodeVectorMath", -400, 1450, operation="SCALE")
     g.feed(grime.inputs[0], gi["Tarnish Color"])
     _sock(grime.inputs, "Scale").default_value = 0.35
@@ -363,11 +426,15 @@ def metal_group() -> bpy.types.ShaderNodeTree:
     m_height = g.math("MULTIPLY", lines, 0.2, 50, -450)  # fine noise stays out of the bump: it reads as grain
     m_height = g.madd(specks, -0.6, m_height, 200, -450)
     m_height = g.madd(dimple, -0.6, m_height, 300, -600)
-    m_height = g.madd(scratch, -0.8, m_height, 350, -700)
+    m_height = g.madd(scratch, -1.2, m_height, 350, -700)
+    m_height = g.madd(mding, -0.9, m_height, 380, -750)
     m_normal = g.node("ShaderNodeBump", 450, -450, inputs={"Strength": 0.2, "Distance": 0.00001, "Height": m_height}).outputs["Normal"]
 
-    # ---- coat: thin polymer or lacquer over the metal; uneven, orange-peeled, worn through
-    coat_w = g.math("MULTIPLY", gi["Coat"], unscratched, 600, 800)
+    # ---- coat: thin polymer or lacquer over the metal; uneven, orange-peeled, worn through.
+    # Bare metal gets a thin film of old grease instead, as much as the copy's grime.
+    grease = g.math("MULTIPLY", grime_amt, g.math("SUBTRACT", 1.0, gi["Coat"], 400, 650), 500, 650)
+    grease = g.math("MULTIPLY", grease, g.madd(edge_w, -0.5, 1.0, 400, 600), 550, 650)
+    coat_w = g.madd(grease, 0.35, g.math("MULTIPLY", gi["Coat"], unscratched, 600, 800), 700, 750)
     c_rough = g.madd(fine, 0.05, gi["Coat Roughness"], 450, 1000)
     c_rough = g.madd(specks, 0.2, c_rough, 550, 1000)
     c_rough = g.madd(age, 0.12, c_rough, 650, 1000)
@@ -376,23 +443,43 @@ def metal_group() -> bpy.types.ShaderNodeTree:
     c_tint = g.node("ShaderNodeVectorMath", 600, 1250, operation="SCALE")
     g.feed(c_tint.inputs[0], gi["Coat Tint"])
     g.feed(_sock(c_tint.inputs, "Scale"), mottle)
+    c_tint = g.mix(g.math("SUBTRACT", 1.0, gi["Coat"], 650, 1350), c_tint.outputs[0], GREASE_TINT, 750, 1300)
+    c_rough = g.madd(g.math("SUBTRACT", 0.30, c_rough, 750, 1100), g.math("SUBTRACT", 1.0, gi["Coat"], 650, 1100), c_rough, 850, 1050)  # grease: 0.30, a thin oily sheen
     c_height = g.madd(specks, 0.6, g.math("MULTIPLY", fine, 0.5, 300, -1100), 450, -1100)
     c_normal = g.node("ShaderNodeBump", 650, -1100, inputs={"Strength": 0.12, "Distance": 0.00001, "Height": c_height}).outputs["Normal"]
+
+    # ---- soot: inside a fired case, heaviest on the floor and lower walls and thinning out
+    # toward the mouth (ragged edge), plus blow-by on the neck outside. Folded into the metal
+    # BSDF (its colour and edge tint go to carbon black, it goes rough) rather than layered as
+    # its own closure: EEVEE evaluates only a few closures per pixel and dropped partial soot.
+    zj = g.madd(g.math("SUBTRACT", lo_b, 0.5, -1000, 2650), 0.25, zn, -900, 2700)
+    upper = g.madd(g.map(zj, 0.5, 1.0, x=-800, y=2650), -0.45, 1.0, -700, 2650)  # full low down, 0.55 at the mouth
+    falloff = g.math("MULTIPLY", upper, g.map(zn, 0.02, 0.2, 1.3, 1.0, x=-800, y=2750), -600, 2700)
+    soot_in = g.math("MULTIPLY", g.math("MULTIPLY", interior, soot_in_amt, -800, 2900), falloff, -600, 2850)
+    soot_in = g.math("MULTIPLY", soot_in, g.map(lo_b, 0.3, 0.7, 0.8, 1.2, x=-800, y=3050), -450, 2900, clamp=True)
+    outside = g.math("SUBTRACT", 1.0, interior, -800, 3200)
+    neck = g.map(zn, 0.62, 0.96, x=-800, y=3350, smooth=True)
+    streak = g.map(streak_fac, 0.3, 0.7, 0.35, 1.0, x=-800, y=3500)  # broad blow-by streaks along the neck
+    soot_out = g.math("MULTIPLY", g.math("MULTIPLY", outside, neck, -600, 3250), g.math("MULTIPLY", soot_out_amt, streak, -600, 3600), -450, 3400, clamp=True)
+    soot = g.map(g.math("ADD", soot_in, soot_out, -300, 3100, clamp=True), 0.05, 0.75, x=-150, y=3100, smooth=True)
+    unsooted = g.math("SUBTRACT", 1.0, soot, 850, 300)
+    colour = g.mix(soot, colour, SOOT, 900, 450)
+    coat_w = g.math("MULTIPLY", coat_w, unsooted, 900, 750)
 
     metal = g.bsdf(
         1000,
         400,
         Base_Color=colour,
-        Metallic=gi["Metallic"],
-        Roughness=rough,
-        Specular_Tint=gi["Edge Tint"],
-        Thin_Film_Thickness=film,
+        Metallic=gi["Metallic"],  # soot darkens the metal's colour and edge tint instead: half-metal looks pale
+        Roughness=g.madd(g.math("SUBTRACT", 0.9, rough, 850, 150), soot, rough, 900, 150),
+        Specular_Tint=g.mix(soot, gi["Edge Tint"], SOOT, 900, -50),
+        Thin_Film_Thickness=g.math("MULTIPLY", film, unsooted, 900, -100),  # a high-index film on soot would glow beige
         Thin_Film_IOR=2.0,
         Normal=m_normal,
         Coat_Weight=coat_w,
         Coat_Roughness=c_rough,
         Coat_IOR=1.5,
-        Coat_Tint=c_tint.outputs[0],
+        Coat_Tint=c_tint,
         Coat_Normal=c_normal,
     )
 
@@ -404,22 +491,13 @@ def metal_group() -> bpy.types.ShaderNodeTree:
     dirt = g.madd(cavity, dirt_amt, g.math("MULTIPLY", patches, dirt_amt, -400, 2400), -250, 2350)
     dirt = g.madd(dirt_amt, 0.12, dirt, -100, 2350, clamp=True)
     dirt = g.math("MULTIPLY", dirt, g.madd(scratch, -0.7, 1.0, -100, 2250), 0, 2350)  # scratches cut through it
+    dirt = g.math("MULTIPLY", dirt, g.madd(edge_w, -0.6, 1.0, -100, 2200), 100, 2350)  # and edges rub it off
     soil = g.mix(soil_b, SOIL_DARK, SOIL_LIGHT, -400, 2150)
     d_height = g.madd(soil_r, 1.0, g.math("MULTIPLY", dimple, 0.5, 300, -900), 450, -900)
     d_normal = g.node("ShaderNodeBump", 650, -900, inputs={"Strength": 0.6, "Distance": 0.00003, "Height": d_height}).outputs["Normal"]
     soil_rough = g.map(soil_fac, 0.3, 0.7, 0.88, 1.0, x=700, y=-700)
     dirt_bsdf = g.bsdf(1000, -300, Base_Color=soil, Metallic=0.0, Roughness=soil_rough, Specular_IOR_Level=0.2, Normal=d_normal)
 
-    # ---- soot layer: inside a fired case (heaviest at the floor) and blow-by on the neck
-    falloff = g.map(zn, 0.05, 0.95, 1.5, 1.0, x=-800, y=2750, smooth=True)
-    soot_in = g.math("MULTIPLY", g.math("MULTIPLY", interior, soot_in_amt, -800, 2900), falloff, -600, 2850)
-    soot_in = g.math("MULTIPLY", soot_in, g.map(lo_b, 0.3, 0.7, 0.8, 1.2, x=-800, y=3050), -450, 2900, clamp=True)
-    outside = g.math("SUBTRACT", 1.0, interior, -800, 3200)
-    neck = g.map(zn, 0.62, 0.96, x=-800, y=3350, smooth=True)
-    streak = g.map(streak_fac, 0.3, 0.7, 0.35, 1.0, x=-800, y=3500)  # broad blow-by streaks along the neck
-    soot_out = g.math("MULTIPLY", g.math("MULTIPLY", outside, neck, -600, 3250), g.math("MULTIPLY", soot_out_amt, streak, -600, 3600), -450, 3400, clamp=True)
-    soot = g.map(g.math("ADD", soot_in, soot_out, -300, 3100, clamp=True), 0.05, 0.75, x=-150, y=3100, smooth=True)
-    soot_bsdf = g.bsdf(1000, -900, Base_Color=SOOT, Metallic=0.0, Roughness=0.9, Specular_IOR_Level=0.1, Normal=m_normal)
 
     # ---- primer sealant: lacquer ring where the cup meets the pocket, sometimes run over the
     # face. Only primers carry `rn` (radius / cup radius) and a `gf_seal` colour.
@@ -435,7 +513,6 @@ def metal_group() -> bpy.types.ShaderNodeTree:
     # ---- layers as closures: metal, sealant on it, then dirt over that, then soot over all
     shader = g.mix_shader(seal_cov, metal, seal_bsdf, 1350, 0)
     shader = g.mix_shader(dirt, shader, dirt_bsdf, 1500, 0)
-    shader = g.mix_shader(soot, shader, soot_bsdf, 1750, 0)
     g.feed(go.inputs["Shader"], shader)
     return ng
 

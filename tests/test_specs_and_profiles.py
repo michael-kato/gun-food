@@ -113,8 +113,13 @@ def test_dings_are_small_and_sharp():
     off = lambda d, dz: variation._dent_offset([d], r, 10.0 + dz, 0.0)  # noqa: E731
     assert _close(off(ding, 0.0), -0.04) and _close(off(dent, 0.0), -0.04)
     assert abs(off(ding, 0.4)) < abs(off(dent, 0.4)), "a ding is narrower at the bottom than a dent"
-    counts = [sum(d.sharp for d in variation.realize(cart, s, "case").case_dents) for s in range(200)]
+    copies = [variation.realize(cart, s, "case") for s in range(200)]
+    counts = [sum(d.sharp for d in cp.case_dents) for cp in copies]
     assert 0.4 < sum(counts) / len(counts) < 1.1, "about one ding per new case or two"
+    nicks = [d for cp in copies for d in cp.rim_dents]
+    assert nicks and all(d.sharp and d.z < cart.case.rim_thickness for d in nicks), "rim nicks sit in the rim"
+    cp = replace(copies[0], rim_dents=[variation.Dent(z=0.6, theta=0.0, radius=0.4, depth=0.04, sharp=True)])
+    assert _close(variation.case_offset(cp, cart.case.rim_dia / 2, 0.6, 0.0), -0.04), "a rim nick cuts into the rim"
 
 
 def test_copies_stay_inside_tolerance():
@@ -172,6 +177,9 @@ def test_dents_push_inward_on_the_body_only():
 
 def test_fired_cases():
     for cart in CARTS:
+        soot = [variation.realize(cart, variation.copy_seed(9, cart.key, i), "fired").soot_in for i in range(200)]
+        clean = sum(s < 0.2 for s in soot) / len(soot)
+        assert 0.1 < clean < 0.3 and max(soot) > 0.8, (cart.key, "about one lot in five burns clean", clean)
         for i in range(10):
             cp = variation.realize(cart, variation.copy_seed(1, cart.key, "fired", i), "fired")
             new = variation.realize(cart, variation.copy_seed(1, cart.key, "fired", i), "case")
@@ -228,7 +236,8 @@ def test_finishes():
         pristine = [k for k in table if makers.makers[k].pristine]
         assert len(pristine) == 1, (cart.key, "one showroom-clean maker per cartridge", pristine)
         clean = variation.realize(cart, 7, "loaded", maker=pristine[0])
-        assert clean.age == 0.0 and clean.bullet_age == 0.0, (cart.key, "pristine stays clean")
+        assert clean.age == 0.0 and clean.bullet_age == 0.0 and clean.grime == 0.0, (cart.key, "pristine stays clean")
+        assert variation.realize(cart, 8, "fired").grime >= 0.3, (cart.key, "range brass is grimy")
         assert variation.realize(cart, 7, "fired", maker=pristine[0]).age >= 0.65, (cart.key, "fired brass ages regardless")
         for i in range(40):
             cp = variation.realize(cart, variation.copy_seed(5, cart.key, i), "loaded")
@@ -237,6 +246,9 @@ def test_finishes():
                 assert cp.age >= 0.15, (cart.key, "factory-new ammo carries some tarnish")
                 lo, hi = variation.JACKET_AGE.get(cp.bullet.jacket, (0.05, 0.4))
                 assert lo <= cp.bullet_age <= min(1.0, hi + 0.4 * cp.lot.age) + 1e-9, (cart.key, cp.bullet.jacket, cp.bullet_age)
+        if cart.key == "9mm":
+            old = variation.realize(cart, 3, "loaded", maker="surplus")
+            assert old.grime >= 0.65 and old.age >= 0.55 and old.lot.sealant == "none", "surplus: rough, no paint"
         if cart.cls == "pistol":
             jackets = {variation.realize(cart, s, "loaded").bullet.jacket for s in range(400)}
             assert {"gilding-metal", "brass", "copper"} <= jackets, (cart.key, jackets)

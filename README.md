@@ -186,8 +186,9 @@ specs/*.toml, bullets/*.toml ──▶ specs.py      load, fill defaults, valida
   mask edges never turn into half-metallic brass with a pale outline. The soil has its own
   grain bump. Soot stays inside the metal layer (its colour and edge tint go to carbon
   black and it turns rough): EEVEE evaluates only a few closures per pixel and dropped a
-  partial soot layer. The group is near the size where the GPU stops compiling it (EEVEE
-  then silently drops parts of it), so it reuses its noise textures' spare outputs.
+  partial soot layer. Compile time is the group's real cost: the GPU compiler inlines every
+  noise texture many times over, and Bump compiles its height graph three times, so the
+  group reuses its noise textures' spare outputs and uses 3D noise (half the code of 4D).
 - **Per-copy drivers** are baked into vertex attributes (`cavity` for recesses instead of
   costly ambient occlusion, `interior`, `zn` height along the case, `anneal` band, `rn`
   primer radius) or set on the object: the object colour (R dirt, G soot inside, B soot

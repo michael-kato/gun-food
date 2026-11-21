@@ -46,7 +46,7 @@ from dataclasses import dataclass
 import bpy
 
 GROUP = "GF Metal"
-GROUP_VERSION = 4  # bump when the group changes: files with an older group get it rebuilt
+GROUP_VERSION = 5  # bump when the group changes: files with an older group get it rebuilt
 
 
 @dataclass(frozen=True)
@@ -178,9 +178,10 @@ class _G:
         return n.outputs[0]
 
     def noise_rgb(self, vec, w, scale, detail, x=0, y=0):
-        n = self.node("ShaderNodeTexNoise", x, y, noise_dimensions="4D")
-        self.feed(n.inputs["Vector"], vec)
-        self.feed(n.inputs["W"], w)
+        """3D noise seeded by shifting the lookup point by ``w`` (4D noise with W compiles to
+        about twice the code); returns Fac and the colour's R, G, B."""
+        n = self.node("ShaderNodeTexNoise", x, y, noise_dimensions="3D")
+        self.feed(n.inputs["Vector"], self.node("ShaderNodeVectorMath", x - 150, y - 80, operation="ADD", inputs={0: vec, 1: w}).outputs[0])
         n.inputs["Scale"].default_value = scale
         n.inputs["Detail"].default_value = detail
         n.inputs["Roughness"].default_value = 0.5
@@ -253,8 +254,10 @@ def metal_group() -> bpy.types.ShaderNodeTree:
     anneal_amt = info.outputs["Alpha"]
 
     # ---- shared noise channels
-    # Noise nodes are the shader's bulk, and a group too big for the GPU fails to compile
-    # (EEVEE then drops parts of it without a word), so every spare output is reused.
+    # Noise textures are where the compile time goes: the GPU compiler inlines each one as
+    # several copies of the noise function, and Bump compiles its height graph three times
+    # (centre and two slopes). A heavier version took ~50 s to compile and once failed
+    # outright, so every spare output is reused and the noise is 3D.
     lo_f, lo_r, lo_g, lo_b = g.noise_rgb(pmm, w, 0.25, 2.0, -1400, 400)  # oxidation, tarnish, drift, anneal streaks
     _, hi_r, hi_g, hi_b = g.noise_rgb(pmm, w, 3.0, 2.0, -1400, 0)  # fine roughness, specks, water spots
     stretch = g.node("ShaderNodeVectorMath", -1600, -550, operation="MULTIPLY")

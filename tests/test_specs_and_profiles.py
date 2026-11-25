@@ -122,6 +122,43 @@ def test_dings_are_small_and_sharp():
     assert _close(variation.case_offset(cp, cart.case.rim_dia / 2, 0.6, 0.0), -0.04), "a rim nick cuts into the rim"
 
 
+def test_flat_spots_and_scratches():
+    by_key = {c.key: c for c in CARTS}
+    for cart in CARTS:
+        cps = [variation.realize(cart, s, "loaded") for s in range(60)]
+        flats = [f for cp in cps for f in cp.case_flats + cp.bullet_flats]
+        scratches = [s for cp in cps for s in cp.case_scratches + cp.bullet_scratches]
+        # counts follow the part's size: about as many per mm^2 as on the 9mm they were tuned on
+        per_mm2 = sum(len(cp.bullet_flats) for cp in cps) / sum(variation._nose_area(cp) for cp in cps)
+        assert 0.15 < per_mm2 < 0.8, (cart.key, per_mm2)
+        per_mm2 = sum(len(cp.case_scratches) for cp in cps) / sum(variation._body_area(cp.case) for cp in cps)
+        assert 0.03 < per_mm2 < 0.3, (cart.key, per_mm2)
+        lengths = sorted(s.length for s in scratches)
+        assert lengths[len(lengths) // 2] < 1.0 and all(0.0 < s.depth < 0.08 for s in scratches), (cart.key, "mostly short and shallow")
+        radii = sorted(f.radius for f in flats)
+        assert radii[len(radii) // 2] < 0.5 and radii[-1] > 0.9, (cart.key, "mostly tiny, the odd medium one")
+        for cp in cps:
+            c = cp.case
+            assert all((c.groove_top or c.rim_thickness) < s.z < c.length for s in cp.case_scratches), (cart.key, "scratches on the case body")
+            assert all(cp.seat_depth < s.z < cp.bullet.length for s in cp.bullet_scratches), (cart.key, "and on the exposed bullet")
+            # small flats on the rim, broad shallow ones on the body
+            assert all(f.z < c.rim_thickness or (not f.fine and f.max_depth < 0.03 and f.z > (c.groove_top or c.rim_thickness)) for f in cp.case_flats), (cart.key, cp.seed)
+            for f in cp.bullet_flats:
+                assert cp.seat_depth < f.z <= cp.bullet.length, (cart.key, "on the exposed nose")
+                if f.z >= cp.bullet.length:  # a flattened tip keeps the round inside SAAMI
+                    assert cp.oal - f.max_depth >= cart.oal_min - TOL, (cart.key, cp.seed)
+    cart = by_key["9mm"]
+    cps = [variation.realize(cart, s, "loaded") for s in range(120)]
+    tips = sum(any(f.z >= cp.bullet.length for f in cp.bullet_flats) for cp in cps)
+    assert 0.03 * len(cps) < tips < 0.4 * len(cps), "some flattened tips"
+    pristine = [variation.realize(cart, s, "loaded", maker="gunfood") for s in range(120)]
+    rough = [variation.realize(cart, s, "loaded", maker="surplus") for s in range(120)]
+    count = lambda cps: sum(len(cp.case_flats) + len(cp.bullet_flats) + len(cp.case_scratches) for cp in cps)  # noqa: E731
+    assert count(pristine) < 0.3 * count(rough), "handled ammo carries more flats and scratches than a pristine lot"
+    fired = [variation.realize(cart, s, "fired") for s in range(60)]
+    assert sum(len(cp.case_flats) for cp in fired) > 2 * sum(len(cp.case_flats) for cp in cps[:60]), "fired rims take more knocks"
+
+
 def test_copies_stay_inside_tolerance():
     for cart in CARTS:
         k = cart.case

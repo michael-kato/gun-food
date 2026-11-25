@@ -37,7 +37,7 @@ import random
 from dataclasses import dataclass, field, replace
 
 from . import specs
-from .profiles import Crimp
+from .profiles import Crimp, bullet_profile
 from .specs import BulletSpec, Cartridge, CaseSpec
 
 # Where real parts sit inside a tolerance band, as a fraction of the band below max:
@@ -86,6 +86,16 @@ class Condition:
     grime: tuple[float, float] = (0.0, 0.0)  # material: grime at least this (the maker sets the rest)
     ding_radius: tuple[float, float] = (0.55, 0.9)  # mm; the lathe's ~0.5 mm vertex spacing carries no smaller
     ding_depth: tuple[float, float] = (0.015, 0.04)  # mm
+    # flat spots (see Flat), scaled by the copy's handling (wear, grime; few on a pristine lot)
+    flats: float = 0.0  # mean count on the exposed bullet nose, any size
+    speckles: float = 0.0  # mean count of tiny ones on top (up to speckle_size)
+    tip_flat_chance: float = 0.0  # a flattened tip (feed ramp, a dropped round)
+    rim_flats: float = 0.0  # mean count on the rim's edge, any size
+    rim_speckles: float = 0.0  # and tiny ones
+    macro_flats: float = 0.0  # mean count of broad, very shallow flattenings per part (case body, bullet)
+    flat_size: tuple[float, float] = (0.3, 1.3)  # mm, footprint half-length; drawn skewed hard to the small end
+    speckle_size: float = 0.55  # mm
+    fine_scratches: float = 0.0  # mean count of tiny scratches pressed into a case (a bullet gets half), see Scratch
 
 
 CONDITIONS = {
@@ -103,6 +113,13 @@ CONDITIONS = {
         dirt=(0.06, 0.18),
         dings=0.7,
         rim_nicks=0.8,
+        flats=16.0,
+        speckles=140.0,
+        tip_flat_chance=0.15,
+        rim_flats=5.0,
+        rim_speckles=45.0,
+        macro_flats=3.0,
+        fine_scratches=90.0,
         wear=(0.1, 0.45),
         age=(0.15, 0.4),  # boxed ammo is never mirror-bright: toning, water spots, handling
     ),
@@ -124,6 +141,11 @@ CONDITIONS = {
         micro=(1.0, 1.6),
         dings=2.5,
         rim_nicks=2.0,
+        rim_flats=14.0,
+        rim_speckles=120.0,
+        macro_flats=5.0,
+        fine_scratches=220.0,
+        flat_size=(0.3, 1.7),
         grime=(0.3, 0.7),
         ding_depth=(0.02, 0.06),
         soot_in=(0.4, 1.0),
@@ -249,6 +271,49 @@ class Dent:
     sharp: bool = False  # a ding: steep walls, pointed bottom (a dent is a smooth dish)
 
 
+@dataclass(frozen=True)
+class Flat:
+    """A flat, or slightly dished, spot pressed in by something hard: a magazine lip, the feed
+    ramp, the extractor, a bench, the next round in a bin. Inside a footprint (a stretched
+    ellipse with a wobbly outline) the surface is pushed toward a plane (see
+    ``mesh.press_flats``), which breaks up its reflection."""
+
+    z: float  # mm from the head (case) or base (bullet); the bullet's length for a flattened tip
+    theta: float  # radians
+    radius: float  # mm, the footprint's long half-axis
+    strength: float = 1.0  # how far toward the plane, 0-1 (1: dead flat)
+    aspect: float = 1.0  # long axis over short
+    orient: float = 0.0  # radians, the long axis's direction
+    wobble: tuple = ()  # (harmonic, amplitude, phase) ripples on the outline
+    cup: float = 0.0  # extra depth in the middle, as a share of the press: slightly concave
+    tilt: float = 0.0  # radians off the surface: a glancing knock
+    tilt_dir: float = 0.0  # radians, which way it tilts
+    max_depth: float = 1.0  # mm, never pressed deeper (keeps a flattened tip inside SAAMI)
+    fine: bool = True  # needs the fine mesh (the broad, gentle ones don't)
+
+
+@dataclass(frozen=True)
+class Scratch:
+    """A tiny scratch pressed into the surface (boxes, magazines, other rounds, the range
+    floor): a shallow groove along a short, slightly bent path (see ``mesh.scratch_lines``)."""
+
+    z: float  # mm, the middle
+    theta: float  # radians
+    angle: float  # radians on the surface: 0 runs along the part's axis, pi/2 around it
+    length: float  # mm
+    width: float  # mm, half-width of the groove
+    depth: float  # mm
+    bend: float = 0.0  # mm, how far the middle sits off a straight line
+
+
+# Flat spot and fine scratch counts were tuned on a 9mm Luger; other parts get them in
+# proportion: case body area (mm^2), rim circumference (mm), exposed bullet area (mm^2).
+REF_BODY, REF_RIM, REF_NOSE = 505.0, 31.4, 288.0
+# Flat spots on a bullet scale with how thick it is where they land (a 9mm nose's typical
+# radius, mm): on a slim rifle ogive a full-size one would press a long crease.
+REF_NOSE_RADIUS = 4.0
+
+
 @dataclass
 class Copy:
     """One concrete cartridge, case or bullet, with every sampled value."""
@@ -264,6 +329,10 @@ class Copy:
     case_dents: list[Dent] = field(default_factory=list)
     rim_dents: list[Dent] = field(default_factory=list)  # extractor nick, rimfire strike
     bullet_dents: list[Dent] = field(default_factory=list)
+    case_flats: list[Flat] = field(default_factory=list)  # on the rim's edge
+    bullet_flats: list[Flat] = field(default_factory=list)
+    case_scratches: list[Scratch] = field(default_factory=list)
+    bullet_scratches: list[Scratch] = field(default_factory=list)
     ovality: tuple[float, float] = (0.0, 0.0)  # amplitude, phase
     runout: tuple[float, float] = (0.0, 0.0)  # tilt degrees, azimuth radians
     primer_strike: tuple[float, float] | None = None  # crater radius, depth (mm)
@@ -297,6 +366,7 @@ class Copy:
             "case_base_dia": round(self.case.base_dia, 4),
             "case_mouth_dia": round(self.case.mouth_dia - (self.crimp.amount if self.crimp else 0.0), 4),
             "dent_count": len(self.case_dents),
+            "flat_count": len(self.case_flats) + len(self.bullet_flats),
             "dirt": round(self.dirt, 3),
         }
         if not self.case.rimfire and self.lot:
@@ -519,7 +589,129 @@ def realize(
     )
     if cond.fired and cp.soot_in < 0.2:  # clean powder: little blow-by either
         cp.soot_out *= 0.3
+    # own streams, so nothing above reshuffles
+    _add_flats(cp, cart, cond, random.Random(copy_seed(seed, "flats")))
+    _add_scratches(cp, cond, random.Random(copy_seed(seed, "scratches")))
     return cp
+
+
+def _add_flats(cp: Copy, cart: Cartridge, cond: Condition, rng) -> None:
+    """Flat spots on the rim's edge and the exposed bullet nose: a great many tiny ones and the
+    odd medium one (a cluster of two or three), more on a well-handled copy; and a few broad,
+    very shallow flattenings on the case body and the bullet."""
+    handling = 0.05 if cp.lot and cp.lot.pristine and not cond.fired else 0.4 + 0.6 * cp.wear + 0.8 * cp.grime
+    lo_r, hi_r = cond.flat_size
+
+    def flat(z, theta, radius=None, tilt=0.2, r_max=hi_r, gentle=1.0):
+        t = rng.random() ** 3  # skewed hard toward the small end
+        r = radius or lo_r * (r_max / lo_r) ** t
+        t = (r - lo_r) / (hi_r - lo_r)
+        return Flat(
+            z, theta, r,
+            strength=gentle * rng.uniform(0.4, 0.9) * (1 - 0.7 * t),  # the bigger, the gentler
+            aspect=1 + 1.4 * rng.random() ** 2,
+            orient=rng.uniform(0, math.pi),
+            wobble=tuple((k, rng.uniform(0.0, 0.2), rng.uniform(0, 2 * math.pi)) for k in (2, 3, 5)),
+            cup=rng.uniform(0.0, 0.4),
+            tilt=rng.uniform(0, tilt) * (1 - 0.6 * t),  # small knocks glance: tiny tilted facets that catch the light
+            tilt_dir=rng.uniform(0, 2 * math.pi),
+        )
+
+    def scatter(out, n, z_range, z_of, surf_r, tilt, r_max=hi_r, gentle=1.0, size=None):
+        for _ in range(n):
+            f = flat(z_of(), rng.uniform(0, 2 * math.pi), tilt=tilt, r_max=r_max, gentle=gentle)
+            if size:
+                f = replace(f, radius=f.radius * size(f.z))
+            out.append(f)
+            if f.radius > 0.5 * hi_r:  # a medium knock leaves a ragged cluster, not one neat oval
+                for _ in range(rng.randint(1, 2)):
+                    d, a = f.radius * rng.uniform(0.5, 0.9), rng.uniform(0, 2 * math.pi)
+                    z = min(max(f.z + d * math.cos(a), z_range[0]), z_range[1])
+                    sat = flat(z, f.theta + d * math.sin(a) / surf_r, f.radius * rng.uniform(0.35, 0.65), tilt, gentle=gentle)
+                    out.append(replace(sat, strength=0.6 * sat.strength))
+
+    def macro(out, n, z_range, radius):  # broad and barely there: they only bend the reflections
+        for _ in range(n):
+            f = flat(rng.uniform(*z_range), rng.uniform(0, 2 * math.pi), rng.uniform(*radius), 0.0)
+            out.append(replace(f, strength=rng.uniform(0.1, 0.25), aspect=1 + 1.5 * rng.random(), cup=0.0, max_depth=rng.uniform(0.008, 0.025), fine=False))
+
+    c = cp.case
+    body_k, rim_k = _body_area(c) / REF_BODY, math.pi * c.rim_dia / REF_RIM
+    body = ((c.groove_top or c.rim_thickness) + 1.0, c.length - 1.0)
+    macro(cp.case_flats, _poisson(rng, cond.macro_flats * handling * body_k), body, (2.0, 4.5))
+    rim = (0.25 * c.rim_thickness, 0.75 * c.rim_thickness)
+    rim_r = min(hi_r, 0.6 * c.rim_thickness + 0.4)
+    scatter(cp.case_flats, _poisson(rng, cond.rim_flats * handling * rim_k), rim, lambda: rng.uniform(*rim), c.rim_dia / 2, 0.25, rim_r)
+    scatter(cp.case_flats, _poisson(rng, cond.rim_speckles * handling * rim_k), rim, lambda: rng.uniform(*rim), c.rim_dia / 2, 0.15, min(rim_r, cond.speckle_size), 0.5)
+    if cp.kind not in ("loaded", "bullet"):
+        return
+    b = cp.bullet
+    lo = (cp.seat_depth if cp.kind == "loaded" else 0.0) + 0.5
+    hi = b.length - 1.2  # off the tip's dome (a flattened tip is its own kind, below)
+    if hi > lo:  # a little more toward the nose, where it meets the magazine lips and the feed ramp
+        nose = lambda: lo + (hi - lo) * rng.random() ** 0.7  # noqa: E731
+        k = handling * _nose_area(cp) / REF_NOSE
+        prof = bullet_profile(b)
+        size = lambda z: min(1.0, max(0.35, _radius_at(prof, z) / REF_NOSE_RADIUS))  # noqa: E731
+        macro(cp.bullet_flats, _poisson(rng, cond.macro_flats * k * 0.6), (lo, max(lo, hi - 1.0)), (1.8, 3.5))
+        scatter(cp.bullet_flats, _poisson(rng, cond.flats * k), (lo, hi), nose, b.dia / 2, 0.35, size=size)
+        scatter(cp.bullet_flats, _poisson(rng, cond.speckles * k), (lo, hi), nose, b.dia / 2, 0.15, cond.speckle_size, 0.5, size=size)
+    if rng.random() < cond.tip_flat_chance * min(1.0, handling):
+        cap = 0.15
+        if cp.kind == "loaded":  # keep the round inside SAAMI's loaded length
+            cap = min(cap, cp.oal - cart.oal_min - 0.02)
+        if cap > 0.02:
+            f = flat(b.length, 0.0, rng.uniform(0.45, 1.0), 0.4)
+            cp.bullet_flats.append(replace(f, strength=rng.uniform(0.7, 1.0), aspect=min(f.aspect, 1.4), cup=0.5 * f.cup, max_depth=cap))
+
+
+def _add_scratches(cp: Copy, cond: Condition, rng) -> None:
+    """Tiny scratches on the case body and the exposed bullet, more on a well-handled copy:
+    about half along the axis (chambering, sliding in a magazine), a fifth around it
+    (tumbling), the rest any which way; mostly short."""
+    handling = 0.05 if cp.lot and cp.lot.pristine and not cond.fired else 0.4 + 0.6 * cp.wear + 0.8 * cp.grime
+
+    def scratch(z_range):
+        u = rng.random()
+        if u < 0.5:
+            angle = rng.gauss(0.0, 0.2)
+        elif u < 0.7:
+            angle = math.pi / 2 + rng.gauss(0.0, 0.2)
+        else:
+            angle = rng.uniform(0, math.pi)
+        length = 0.3 * (4.0 / 0.3) ** (rng.random() ** 2)  # skewed short
+        return Scratch(rng.uniform(*z_range), rng.uniform(0, 2 * math.pi), angle, length,
+                       rng.uniform(0.1, 0.18), rng.uniform(0.03, 0.065), rng.uniform(-0.12, 0.12) * length)
+
+    c = cp.case
+    body = ((c.groove_top or c.rim_thickness) + 0.3, c.length - 0.2)
+    n = _poisson(rng, cond.fine_scratches * handling * _body_area(c) / REF_BODY)
+    cp.case_scratches = [scratch(body) for _ in range(n)]
+    if cp.kind in ("loaded", "bullet"):
+        b = cp.bullet
+        lo, hi = (cp.seat_depth if cp.kind == "loaded" else 0.0) + 0.3, b.length - 1.0
+        if hi > lo:
+            n = _poisson(rng, 0.5 * cond.fine_scratches * handling * _nose_area(cp) / REF_NOSE)
+            cp.bullet_scratches = [scratch((lo, hi)) for _ in range(n)]
+
+
+def _radius_at(profile, z: float) -> float:
+    """Outer radius (mm) of a closed lathe profile at height ``z``."""
+    best = 0.0
+    for (r0, z0, _), (r1, z1, _) in zip(profile, profile[1:] + profile[:1]):
+        if z0 != z1 and min(z0, z1) <= z <= max(z0, z1):
+            best = max(best, r0 + (r1 - r0) * (z - z0) / (z1 - z0))
+    return best
+
+
+def _body_area(c: CaseSpec) -> float:
+    """mm^2 of case wall above the extractor groove."""
+    return math.pi * c.base_dia * (c.length - (c.groove_top or c.rim_thickness))
+
+
+def _nose_area(cp: Copy) -> float:
+    """mm^2 of bullet out in the open (all of it for a loose bullet), as a cylinder."""
+    return math.pi * cp.bullet.dia * (cp.bullet.length - (cp.seat_depth if cp.kind == "loaded" else 0.0))
 
 
 def _bullet_age(lot: Lot, jacket: str, rng: random.Random) -> float:

@@ -20,6 +20,8 @@ STAMP_DEPTH = 0.16  # mm, how deep headstamp letter cores are pressed in
 MICRO_AMP = 0.008  # mm, micro relief on smooth surfaces (scaled per copy, see variation.Copy.micro)
 MICRO_EDGE = 3.0  # times as much right at an edge (mouth, rim, bullet tip and base)
 MICRO_FALLOFF = 0.8  # mm, how fast the edge boost fades
+FINE_STEP = 0.15  # mm, mesh spacing on parts with flat spots or fine scratches
+FLAT_DEPTH = 0.045  # a flat spot's plane sits at most this times its size below the surface
 
 
 def lathe(name: str, profile, segments: int, offset=None) -> bpy.types.Mesh:
@@ -101,6 +103,104 @@ def micro_relief(me: bpy.types.Mesh, amount: float, seed: int, edges=(), waves: 
     scale = np.where(r > 1e-6, (r + off) / np.maximum(r, 1e-6), 1.0)
     co[:, 0] *= scale
     co[:, 1] *= scale
+    me.vertices.foreach_set("co", (co * MM).ravel())
+    me.update()
+
+
+def press_flats(me: bpy.types.Mesh, flats) -> None:
+    """Press flat spots (``variation.Flat``) into a lathed part. Inside each footprint (an
+    ellipse ``radius`` along its long half-axis, with a wobbly outline) the surface is pushed
+    toward the plane through the footprint's lowest point, by ``strength`` (1: dead flat),
+    dished by ``cup``; the outer third blends back into the surface. The plane never sits
+    deeper than FLAT_DEPTH times the footprint (or ``max_depth``), so a footprint reaching
+    over a corner or the tip's dome flattens rather than crushes it. Vertices move along the plane's normal, so a flat can sit anywhere, the very tip
+    of a bullet included; only the outside moves (inner walls face away from the plane)."""
+    if not flats:
+        return
+    n = len(me.vertices)
+    co = np.empty(n * 3)
+    me.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3) / MM
+    nor = np.empty(n * 3)
+    me.vertex_normals.foreach_get("vector", nor)
+    nor = nor.reshape(-1, 3)
+    r = np.hypot(co[:, 0], co[:, 1])
+    th = np.arctan2(co[:, 1], co[:, 0])
+    outward = nor[:, 0] * np.cos(th) + nor[:, 1] * np.sin(th) > 0.2
+    ztop = co[:, 2].max()
+    for f in flats:
+        if f.z >= ztop - 0.05:  # a flattened tip
+            i = int(np.argmax(co[:, 2]))
+        else:  # the outside vertex nearest (z, theta)
+            arc = np.abs((th - f.theta + np.pi) % (2 * np.pi) - np.pi) * np.maximum(r, 0.5)
+            i = int(np.argmax(np.where(outward, r - 5.0 * (np.abs(co[:, 2] - f.z) + arc), -np.inf)))
+        c, n0 = co[i].copy(), nor[i] / max(np.linalg.norm(nor[i]), 1e-9)
+        side = np.array([math.cos(f.tilt_dir), math.sin(f.tilt_dir), 0.0])
+        t = np.cross(n0, side if abs(n0 @ side) < 0.9 else np.array([0.0, 0.0, 1.0]))
+        t /= max(np.linalg.norm(t), 1e-9)
+        nrm = math.cos(f.tilt) * n0 + math.sin(f.tilt) * t
+        e1 = np.array([0.0, 0.0, 1.0]) - nrm[2] * nrm  # footprint axes: along the part, around it
+        if np.linalg.norm(e1) < 0.1:
+            e1 = np.cross(nrm, np.array([1.0, 0.0, 0.0]))
+        e1 /= np.linalg.norm(e1)
+        e2 = np.cross(nrm, e1)
+        rel = co - c
+        cand = np.nonzero((np.einsum("ij,ij->i", rel, rel) < (1.25 * f.radius) ** 2) & (nor @ nrm > 0.6))[0]
+        if not len(cand):
+            continue
+        rel = rel[cand]
+        along = rel @ nrm
+        x, y = rel @ e1, rel @ e2
+        co_, so_ = math.cos(f.orient), math.sin(f.orient)
+        xr, yr = x * co_ + y * so_, (y * co_ - x * so_) * f.aspect
+        psi = np.arctan2(yr, xr)
+        outline = 1.0 + sum(a * np.cos(k * psi + ph) for k, a, ph in f.wobble)
+        s = np.hypot(xr, yr) / f.radius / np.maximum(outline, 0.4)
+        inside = s < 1.0
+        if not inside.any():
+            continue
+        cap = min(f.max_depth, FLAT_DEPTH * f.radius) / max(f.strength, 1e-3)
+        h = np.maximum(along - max(along[inside].min(), -cap), 0.0)  # height above the plane
+        dish = f.cup * h[inside].max() * np.clip(1 - s * s, 0.0, 1.0)
+        u = np.clip((1.0 - s) / 0.35, 0.0, 1.0)
+        disp = f.strength * (h + dish) * u * u * (3 - 2 * u)
+        co[cand] -= np.outer(disp, nrm)
+    me.vertices.foreach_set("co", (co * MM).ravel())
+    me.update()
+
+
+def scratch_lines(me: bpy.types.Mesh, scratches) -> None:
+    """Press tiny scratches (``variation.Scratch``) into a lathed part: each a shallow V-ish
+    groove (sharp in the middle, so it catches a thin line of light) tapering out at both ends, along a short, slightly bent path measured
+    on the surface (z along the axis, arc length around it). Vertices sink along their
+    normals; crossing scratches don't stack; only the outside moves."""
+    if not scratches:
+        return
+    n = len(me.vertices)
+    co = np.empty(n * 3)
+    me.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3) / MM
+    nor = np.empty(n * 3)
+    me.vertex_normals.foreach_get("vector", nor)
+    nor = nor.reshape(-1, 3)
+    r = np.hypot(co[:, 0], co[:, 1])
+    th = np.arctan2(co[:, 1], co[:, 0])
+    z = co[:, 2]
+    outside = nor[:, 0] * np.cos(th) + nor[:, 1] * np.sin(th) > 0.2
+    disp = np.zeros(n)
+    for s in scratches:
+        reach = s.length / 2 + s.width + abs(s.bend)
+        idx = np.nonzero(outside & (np.abs(z - s.z) < reach))[0]
+        if not len(idx):
+            continue
+        dz = z[idx] - s.z
+        dt = ((th[idx] - s.theta + np.pi) % (2 * np.pi) - np.pi) * r[idx]
+        ca, sa = math.cos(s.angle), math.sin(s.angle)
+        x = (dz * ca + dt * sa) / (s.length / 2)  # -1..1 along
+        across = (dt * ca - dz * sa) - s.bend * (1 - x * x)
+        groove = np.clip(1 - np.abs(across) / s.width, 0.0, 1.0) ** 1.5 * np.sqrt(np.clip(1 - x * x, 0.0, 1.0))
+        disp[idx] = np.maximum(disp[idx], s.depth * groove)
+    co -= nor * disp[:, None]
     me.vertices.foreach_set("co", (co * MM).ravel())
     me.update()
 

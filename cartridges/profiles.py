@@ -275,12 +275,19 @@ def bullet_profile(b: BulletSpec, seat_depth: float | None = None, seg: int = 32
             pts.append((pr, pz, 0, J))
     else:
         m = b.tip_dia / 2
-        ogive = _ogive_flat(r, m, z_nose, b.nose_length, seg)
-        for i, (orr, oz) in enumerate(ogive):
-            last = i == len(ogive) - 1
-            pts.append((orr, oz, min(0.6, m * 0.25) if last else 0, J))
+        edge = min(1.6, m * 0.5)  # a well rounded meplat edge
+        *ogive, corner = _ogive_flat(r, m, z_nose, b.nose_length, seg)
+        # the ogive's points crowd the meplat, and a rounding can't be wider than about half
+        # the segments beside it (see _fillet_arc): clear just enough of them out of its way
+        far = next(q for q in reversed(ogive) if math.hypot(q[0] - corner[0], q[1] - corner[1]) > 0.3)
+        theta = math.acos((corner[0] - far[0]) / math.hypot(far[0] - corner[0], far[1] - corner[1]))
+        room = edge / math.tan(theta / 2) / 0.45
+        for orr, oz in ogive:
+            if math.hypot(orr - corner[0], oz - corner[1]) > room:
+                pts.append((orr, oz, 0, J))
+        pts.append((corner[0], corner[1], edge, J))
         pts.append((0.0, L, 0, J))
-    return round_corners(pts, seg=4)
+    return round_corners(pts, seg=8)
 
 
 def primer_profile(c: CaseSpec, recess: float = 0.08, strike: tuple[float, float] | None = None):

@@ -92,9 +92,10 @@ blender --background --factory-startup --python build.py -- --report docs/dimens
 | `--out PATH` | where to write the .blend (default `cartridges.blend`) |
 | `--cpu` | Cycles only: render on the CPU |
 
-A full build takes about 30 s and makes ~1.7M vertices; the four preview images take about
-20 s in EEVEE. The .blend is about 60 MB, so it isn't kept in git: build it, or download it
-from the repo's Releases.
+A full build takes about 3 minutes and makes ~12.7M vertices, most of them in the fine mesh
+that carries the flat spots and scratches; the four preview images take about 50 s in EEVEE.
+The .blend is about 425 MB, so it isn't kept in git: build it, or download it from the repo's
+Releases.
 
 ## How it works
 
@@ -136,8 +137,22 @@ specs/*.toml, bullets/*.toml ──▶ specs.py      load, fill defaults, valida
   and lead bullets, more once fired), so reflections wobble slightly instead of looking
   machined, plus the odd small, sharp ding (about one in every new case or two, a few on
   fired brass) and little nicks in the rim's edge. It only goes inward, so measured
-  diameters stay in their bands. Hairline scratches and pits are in the shader: the mesh is
-  too coarse to carry them.
+  diameters stay in their bands.
+- **Flat spots and fine scratches** (pressed into the mesh): a great many tiny flat or
+  slightly dished spots on the exposed bullet and the rim's edge, from magazine lips, feed
+  ramps, extractors and other rounds in the box. They have ragged, stretched outlines and
+  sizes skewed hard to the small end (half under about 0.6 mm across), with the odd medium
+  knock as a ragged cluster and now and then a flattened tip (never pushing a round under
+  SAAMI's minimum length). A few broad, barely-there flattenings (4-9 mm across, at most a
+  few hundredths of a mm deep) bend the reflections on case bodies and bullets, and short
+  shallow scratches run mostly along the case and bullet, some around them, some any which
+  way. How many follows handling (wear and grime: most on surplus and fired brass, a few on
+  ordinary new ammo, next to none on the pristine house brand) and size (counts were tuned
+  per mm² on a 9mm; a bullet's spots shrink where it slims, so a rifle ogive isn't creased).
+  Parts that carry them are lathed with a ~0.15 mm mesh all over (subdividing just the
+  spots left seams that showed as facets). The finest groove that carries is about 0.2 mm
+  wide, so these scratches show as soft streaks in the reflections; the crisp hairlines and
+  pits are in the shader.
 - **Grime and handling** (`grime` per maker, `gf_grime` on each part): a thin film of old
   grease, darker oxidation patches, thousands of tiny pits and hairline scratches running
   every which way. Convex edges (rims, mouths, headstamp lips, bullet bases; the baked

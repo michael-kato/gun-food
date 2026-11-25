@@ -14,6 +14,7 @@ from .materials import ground_material, label_material, metal_material, paint_ma
 from .mesh import (
     BULLET_SEGMENTS,
     CASE_SEGMENTS,
+    FINE_STEP,
     MM,
     PRIMER_SEGMENTS,
     apply_boolean,
@@ -26,7 +27,9 @@ from .mesh import (
     lathe,
     micro_relief,
     paint_tip,
+    press_flats,
     primer_attrs,
+    scratch_lines,
 )
 
 GAP = 10.0  # mm between groups
@@ -127,13 +130,24 @@ def _collection(name, parent=None):
 # ---------------------------------------------------------------- per-copy meshes
 
 
+def _fine_segments(base: int, radius: float) -> int:
+    """Meridians for about FINE_STEP between them at ``radius`` (mm), a multiple of 8."""
+    return max(base, 8 * math.ceil(2 * math.pi * radius / FINE_STEP / 8))
+
+
 def case_mesh(cart, cp: variation.Copy, name: str) -> tuple[bpy.types.Mesh, str]:
     """Unique case mesh for one copy: sampled dimensions, crimp, dents, the maker's headstamp."""
-    prof = profiles.refine(profiles.case_profile(cp.case, cp.crimp), REFINE, outside_only=True)
-    me = lathe(name, prof, CASE_SEGMENTS, offset=lambda r, z, t: variation.case_offset(cp, r, z, t))
     c = cp.case
+    # flat spots and fine scratches need a fine mesh to move (all of the outside: patches of
+    # fine mesh show their seams in the reflections)
+    fine = bool(cp.case_scratches) or any(f.fine for f in cp.case_flats)
+    prof = profiles.refine(profiles.case_profile(cp.case, cp.crimp), FINE_STEP if fine else REFINE, outside_only=True)
+    segs = _fine_segments(CASE_SEGMENTS, max(c.rim_dia, c.base_dia) / 2) if fine else CASE_SEGMENTS
+    me = lathe(name, prof, segs, offset=lambda r, z, t: variation.case_offset(cp, r, z, t))
     edges = (0.0, c.rim_thickness, c.groove_top or c.rim_thickness, c.length)
     micro_relief(me, cp.micro, variation.copy_seed(cp.seed, "micro-case"), edges)
+    press_flats(me, cp.case_flats)
+    scratch_lines(me, cp.case_scratches)
     me.materials.append(metal_material(cp.case.material))
     tools, region = headstamp_tools(cart, cp, random.Random(cp.headstamp_seed))
     solver = "none"
@@ -152,10 +166,14 @@ def case_mesh(cart, cp: variation.Copy, name: str) -> tuple[bpy.types.Mesh, str]
 
 
 def bullet_mesh(cp: variation.Copy, name: str) -> bpy.types.Mesh:
-    prof = profiles.refine(profiles.bullet_profile(cp.bullet), REFINE * 1.2, outside_only=True)
-    me = lathe(name, prof, BULLET_SEGMENTS, offset=(lambda r, z, t: variation.bullet_offset(cp, r, z, t)) if cp.bullet_dents else None)
+    fine = bool(cp.bullet_scratches) or any(f.fine for f in cp.bullet_flats)  # see case_mesh
+    prof = profiles.refine(profiles.bullet_profile(cp.bullet), FINE_STEP if fine else REFINE * 1.2, outside_only=True)
+    segs = _fine_segments(BULLET_SEGMENTS, cp.bullet.dia / 2) if fine else BULLET_SEGMENTS
+    me = lathe(name, prof, segs, offset=(lambda r, z, t: variation.bullet_offset(cp, r, z, t)) if cp.bullet_dents else None)
     soft = {"copper": 1.4, "lead": 1.8}.get(cp.bullet.jacket, 1.0)  # plated and bare lead take knocks easily
     micro_relief(me, cp.micro * soft, variation.copy_seed(cp.seed, "micro-bullet"), (0.0, cp.bullet.length))
+    press_flats(me, cp.bullet_flats)
+    scratch_lines(me, cp.bullet_scratches)
     me.materials.append(metal_material(cp.bullet.jacket))
     me.materials.append(metal_material(cp.bullet.core))
     if cp.lot and cp.lot.tip != "none" and cp.tip_length > 0:
